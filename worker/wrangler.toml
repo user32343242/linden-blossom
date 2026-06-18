@@ -5,12 +5,12 @@ compatibility_date = "2024-09-23"
 # KV Namespace: счётчик заказов
 [[kv_namespaces]]
 binding = "ORDERS_META"     # имя переменной в коде Worker
-id      = "<paste-kv-id-here>" # ID из Dashboard
+id      = "77b5cf56e3ef4c3daea1ea7d53bca521" # ID из Dashboard
 
 # KV Namespace: JSON букетов
 [[kv_namespaces]]
 binding = "BOUQUETS_STORE"
-id      = "<paste-kv-id-here>"
+id      = "95fbf5d4b2f649d2b79ad6cb6c1d6b51"
 
 # D1 SQLite: заказы
 [[d1_databases]]
