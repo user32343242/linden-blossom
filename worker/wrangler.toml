@@ -1,0 +1,24 @@
+name = "linden-blossom-api"
+main = "src/index.js"
+compatibility_date = "2024-09-23"
+
+# KV Namespace: счётчик заказов
+[[kv_namespaces]]
+binding = "ORDERS_META"     # имя переменной в коде Worker
+id      = "<paste-kv-id-here>" # ID из Dashboard
+
+# KV Namespace: JSON букетов
+[[kv_namespaces]]
+binding = "BOUQUETS_STORE"
+id      = "<paste-kv-id-here>"
+
+# D1 SQLite: заказы
+[[d1_databases]]
+binding      = "DB"
+database_name = "linden_orders"
+database_id  = "<paste-d1-id-here>"
+
+# Переменные среды (секреты через `wrangler secret put`)
+[vars]
+ADMIN_USER   = "admin"
+CORS_ORIGIN  = "https://linden-blossom.pages.dev"
