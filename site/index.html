@@ -1698,45 +1698,75 @@ function renderCatalog() {
     requestAnimationFrame(renderCatalog);
 }
 
-const form = $('#orderForm');
-const formSuccess = $('#formSuccess');
-function validateField(input) {
-    let valid = true;
-    if (input.id === 'name') valid = input.value.trim().length >= 2;
-    else if (input.id === 'phone') valid = /^[+\d\s\-()]{10,}$/.test(input.value.trim());
-    input.classList.toggle('invalid', !valid); return valid;
-}
-$$('#orderForm .form-input').forEach(input => {
-    input.addEventListener('blur', () => { if (input.value.trim()) validateField(input); });
-    input.addEventListener('input', () => { if (input.classList.contains('invalid')) validateField(input); });
-});
-form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    if (validateField($('#name')) && validateField($('#phone'))) {
-        const submitBtn = form.querySelector('.form-submit');
-        submitBtn.disabled = true;
-        submitBtn.textContent = state.lang === 'ru' ? 'Отправка...' : state.lang === 'en' ? 'Sending...' : '发送中...';
-        setTimeout(() => {
-            form.style.display = 'none'; formSuccess.classList.add('show');
-            setTimeout(() => {
-                form.reset(); form.style.display = 'block'; formSuccess.classList.remove('show');
-                submitBtn.disabled = false; submitBtn.textContent = I18N[state.lang]['form.submit'];
-                $$('#orderForm .form-input').forEach(i => i.classList.remove('invalid'));
-            }, 4500);
-        }, 800);
-    } else {
-        const firstInvalid = form.querySelector('.form-input.invalid');
-        if (firstInvalid) firstInvalid.focus();
-    }
-});
+// ── Конфигурация Worker API ─────────────────────────
+const API_BASE = 'https://linden-blossom-api.privatetwe7ve.workers.dev';
+// Если Worker на своём домене, замени на свой URL:
+// const API_BASE = 'https://api.lindenblossom.ru';
 
-$$('.fs-btn[data-lang]').forEach(btn => {
-    const isActive = btn.dataset.lang === state.lang;
-    btn.classList.toggle('active', isActive); btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
-});
-$$('.fs-btn[data-currency]').forEach(btn => {
-    const isActive = btn.dataset.currency === state.currency;
-    btn.classList.toggle('active', isActive); btn.setAttribute('aria-checked', isActive ? 'true' : 'false');
+// ── Перехватить форму заказа ─────────────────────────
+$('#orderForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const form = e.target;
+  const submit = $('.form-submit');
+
+  const name = $('#name').value.trim();
+  const phone = $('#phone').value.trim();
+
+  // Сброс старых ошибок
+  $('#name').closest('.form-group')?.classList.remove('error');
+  $('#phone').closest('.form-group')?.classList.remove('error');
+
+  // Простая валидация
+  let hasError = false;
+
+  if (!name) {
+    $('#name').closest('.form-group')?.classList.add('error');
+    hasError = true;
+  }
+
+  if (!phone) {
+    $('#phone').closest('.form-group')?.classList.add('error');
+    hasError = true;
+  }
+
+  if (hasError) return;
+
+  submit.disabled = true;
+  submit.textContent = 'Отправляем...';
+
+  try {
+    const res = await fetch(`${API_BASE}/api/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        phone,
+        bouquet: $('#bouquet')?.value.trim() || '',
+        message: $('#message')?.value.trim() || ''
+      })
+    });
+
+    const data = await res.json();
+
+    if (res.ok) {
+      $('#formSuccess').innerHTML = `
+        <div class="success-icon">🌼</div>
+        <h3>Спасибо, ${name}!</h3>
+        <p>Ваш заказ <strong>${data.orderId}</strong></p>
+        <p>Мы свяжемся с вами в течение часа</p>
+      `;
+      $('#formSuccess').style.display = 'flex';
+      form.style.display = 'none';
+    } else {
+      throw new Error(data.error || 'Ошибка сервера');
+    }
+  } catch (err) {
+    submit.disabled = false;
+    submit.textContent = 'Отправить заявку →';
+    alert('Ошибка отправки. Позвоните нам напрямую.');
+    console.error(err);
+  }
 });
 
 applyI18n();
