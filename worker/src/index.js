@@ -27,9 +27,15 @@ export default {
 };
 
 function corsResponse(response, env) {
-  const headers = new Headers(response.headers);
-  headers.set('Access-Control-Allow-Origin',  env.CORS_ORIGIN || '*');
-  headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  return new Response(response.body, { status: response.status, headers });
+  const origin = env.CORS_ORIGIN || '*';
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: {
+      ...Object.fromEntries(response.headers),
+      'Access-Control-Allow-Origin': origin,
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    }
+  });
 }

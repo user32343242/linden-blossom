@@ -1,0 +1,13 @@
+{
+  "name": "linden-blossom-worker",
+  "version": "1.0.0",
+  "description": "Cloudflare Worker for Linden blossom floristry",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {},
+  "devDependencies": {}
+}
