@@ -1,0 +1,91 @@
+<!-- Таблица заказов -->
+<section id="ordersSection">
+  <h2>Заказы</h2>
+  <table id="ordersTable"><thead><tr>
+    <th>ID заказа</th><th>Имя</th><th>Телефон</th><th>Букет</th><th>Статус</th><th>Дата</th>
+  </tr></thead><tbody id="ordersTbody"></tbody></table>
+</section>
+
+<!-- JSON-редактор карточек -->
+<section id="bouquetsSection">
+  <h2>Карточки букетов</h2>
+  <textarea id="jsonEditor" rows="30"></textarea>
+  <div id="jsonError"></div>
+  <button onclick="saveBouquets()">💾 Сохранить</button>
+  <button onclick="formatJson()">Форматировать</button>
+</section>
+
+<script>
+// Base64 credentials для Basic Auth
+const CREDS = btoa(`${localStorage.getItem('admin_user')}:${localStorage.getItem('admin_pass')}`);
+const API   = ''; // пустая строка = относительный путь (Worker сам отдаёт)
+
+async function loadOrders() {
+  const res  = await fetch('/admin/orders', {
+    headers: { 'Authorization': `Basic ${CREDS}` }
+  });
+  const rows = await res.json();
+  const tbody = document.getElementById('ordersTbody');
+  tbody.innerHTML = rows.map(r => `
+    <tr>
+      <td><code>${r.order_id}</code></td>
+      <td>${r.name}</td>
+      <td>${r.phone}</td>
+      <td>${r.bouquet || '—'}</td>
+      <td>
+        <select onchange="updateStatus(${r.id}, this.value)">
+          ${['new','confirmed','done','cancelled'].map(s =>
+            `<option ${s===r.status?'selected':''}>${s}</option>`).join('')}
+        </select>
+      </td>
+      <td>${r.created_at}</td>
+    </tr>`).join('');
+}
+
+async function updateStatus(id, status) {
+  await fetch(`/admin/orders/${id}`, {
+    method: 'PATCH',
+    headers: { 'Authorization': `Basic ${CREDS}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status })
+  });
+}
+
+async function loadBouquets() {
+  const res  = await fetch('/api/bouquets', {
+    headers: { 'Authorization': `Basic ${CREDS}` }
+  });
+  const data = await res.json();
+  document.getElementById('jsonEditor').value = JSON.stringify(data, null, 2);
+}
+
+function formatJson() {
+  try {
+    const el  = document.getElementById('jsonEditor');
+    el.value  = JSON.stringify(JSON.parse(el.value), null, 2);
+    document.getElementById('jsonError').textContent = '';
+  } catch (e) {
+    document.getElementById('jsonError').textContent = `JSON Error: ${e.message}`;
+  }
+}
+
+async function saveBouquets() {
+  let parsed;
+  try {
+    parsed = JSON.parse(document.getElementById('jsonEditor').value);
+  } catch (e) {
+    document.getElementById('jsonError').textContent = `JSON Error: ${e.message}`;
+    return;
+  }
+
+  const res = await fetch('/api/bouquets', {
+    method:  'PUT',
+    headers: { 'Authorization': `Basic ${CREDS}`, 'Content-Type': 'application/json' },
+    body:    JSON.stringify(parsed)
+  });
+  const result = await res.json();
+  alert(res.ok ? `✅ Сохранено ${result.count} букетов` : `❌ ${result.error}`);
+}
+
+loadOrders();
+loadBouquets();
+</script>
