@@ -1772,7 +1772,10 @@ $('#orderForm').addEventListener('submit', async (e) => {
         <p>Ваш заказ <strong>${data.orderId}</strong></p>
         <p>Мы свяжемся с вами в течение часа</p>
       `;
+    
       $('#formSuccess').style.display = 'flex';
+      $('#formSuccess').style.flexDirection = 'column';
+    
       form.style.display = 'none';
     } else {
       throw new Error(data.error || 'Ошибка сервера');
