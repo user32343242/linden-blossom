@@ -383,9 +383,11 @@ function getAdminHTML() {
   <div id="loginWrapper" class="login-wrapper">
     <div class="login-box">
       <h1>🌸 Linden Admin</h1>
-      <input type="text" id="user" placeholder="admin" value="admin">
-      <input type="password" id="pass" placeholder="Password" autocomplete="current-password">
-      <button onclick="login()">Login</button>
+      <form onsubmit="event.preventDefault(); login();">
+        <input type="text" id="user" placeholder="admin" value="admin">
+        <input type="password" id="pass" placeholder="Password" autocomplete="current-password">
+        <button type="submit">Login</button>
+      </form>
       <div id="loginError" class="error hidden"></div>
     </div>
   </div>
@@ -461,9 +463,21 @@ function getAdminHTML() {
       auth = 'Basic ' + btoa(u + ':' + p);
       localStorage.setItem('admin_user', u);
       localStorage.setItem('admin_pass', p);
-      document.getElementById('loginWrapper').classList.add('hidden');
-      document.getElementById('panel').classList.remove('hidden');
-      refreshOrders();
+      // Verify auth works by fetching orders
+      fetch('/admin/orders', { headers: { Authorization: auth } })
+        .then(r => {
+          if (!r.ok) throw new Error('Login failed: invalid credentials');
+          return r.json();
+        })
+        .then(() => {
+          document.getElementById('loginWrapper').classList.add('hidden');
+          document.getElementById('panel').classList.remove('hidden');
+          refreshOrders();
+        })
+        .catch(e => {
+          showLoginError(e.message);
+          auth = '';
+        });
     }
 
     function logout() {
@@ -490,8 +504,9 @@ function getAdminHTML() {
 
     async function refreshOrders() {
       try {
+        if (!auth) throw new Error('Not logged in');
         const r = await fetch('/admin/orders', { headers: { Authorization: auth } });
-        if (!r.ok) throw new Error('Auth failed: ' + r.status);
+        if (!r.ok) throw new Error('Auth failed (401) - check your password');
         const d = await r.json();
         renderOrders(d);
       } catch (e) {
@@ -549,8 +564,9 @@ function getAdminHTML() {
 
     async function refreshBouquets() {
       try {
+        if (!auth) throw new Error('Not logged in');
         const r = await fetch('/admin/bouquets', { headers: { Authorization: auth } });
-        if (!r.ok) throw new Error('Auth failed: ' + r.status);
+        if (!r.ok) throw new Error('Auth failed (401) - check your password');
         const d = await r.json();
         document.getElementById('bouquetsEditor').value = JSON.stringify(d, null, 2);
       } catch (e) {
