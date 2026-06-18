@@ -1,0 +1,16 @@
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.local
+.env.*.local
+.DS_Store
+.wrangler/
+.vscode/
+*.swp
+*.swo
+*~
+.idea/
+worker/.miniflare/
+*.db
