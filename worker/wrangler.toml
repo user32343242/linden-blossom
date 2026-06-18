@@ -16,7 +16,7 @@ id      = "95fbf5d4b2f649d2b79ad6cb6c1d6b51"
 [[d1_databases]]
 binding      = "DB"
 database_name = "linden_orders"
-database_id  = "<paste-d1-id-here>"
+database_id  = "be2ef2c2-1689-4a04-b518-bb0b58ec4cf6"
 
 # Переменные среды (секреты через `wrangler secret put`)
 [vars]
