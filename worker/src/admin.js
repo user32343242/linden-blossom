@@ -384,7 +384,7 @@ function getAdminHTML() {
     <div class="login-box">
       <h1>🌸 Linden Admin</h1>
       <form onsubmit="event.preventDefault(); login();">
-        <input type="text" id="user" placeholder="admin" value="admin">
+        <input type="text" id="user" placeholder="admin" value="admin" autocomplete="username">
         <input type="password" id="pass" placeholder="Password" autocomplete="current-password">
         <button type="submit">Login</button>
       </form>

@@ -7,7 +7,11 @@ export function isAuthorized(request, env) {
   if (!authHeader?.startsWith('Basic ')) return false;
 
   const decoded   = atob(authHeader.slice(6));   // "user:pass"
-  const [user, pass] = decoded.split(':');
+  const colonIdx  = decoded.indexOf(':');
+  if (colonIdx === -1) return false;
+  
+  const user = decoded.slice(0, colonIdx);
+  const pass = decoded.slice(colonIdx + 1);
 
   return user === (env.ADMIN_USER || 'admin')
       && pass === env.ADMIN_PASSWORD;              // из wrangler secret
