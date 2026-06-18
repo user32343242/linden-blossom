@@ -87,7 +87,7 @@ export async function handleOrders(request, env) {
     // ── 3. Формируем финальный orderId ─────────────────────────────
     const seqStr = String(rowId).padStart(4, '0'); // 0001
     const cleaned = phone.replace(/\D/g, '');      // только цифры
-    const orderId = `#${seqStr}+${cleaned}`;
+    const orderId = `#${seqStr}_${cleaned}`;
 
     // ── 4. Обновляем запись финальными данными ─────────────────────
     try {

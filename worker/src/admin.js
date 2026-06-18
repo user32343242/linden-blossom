@@ -1,39 +1,85 @@
+// C:\Users\VECTOR\linden-blossom\worker\src\admin.js
+
 import { isAuthorized, unauthorizedResponse } from './auth.js';
 
 export async function handleAdmin(request, env) {
-  const url    = new URL(request.url);
-  const path   = url.pathname;
+  const url = new URL(request.url);
+  const path = url.pathname;
   const method = request.method;
 
-  // Allow unauthenticated access to the login form
   if (path === '/admin' || path === '/admin/') {
     return new Response(getAdminHTML(), {
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
     });
   }
 
-  // Require auth for API endpoints
   if (!isAuthorized(request, env)) {
     return unauthorizedResponse();
   }
 
-  // GET orders list
   if (path === '/admin/orders' && method === 'GET') {
     try {
-      const result = await env.DB
-        .prepare(`SELECT * FROM orders ORDER BY id DESC LIMIT 100`)
-        .all();
-      return json(result.results || []);
+      const url = new URL(request.url);
+      const limit = parseInt(url.searchParams.get('limit') || '100');
+      const offset = parseInt(url.searchParams.get('offset') || '0');
+      const status = url.searchParams.get('status');
+
+      let query = 'SELECT * FROM orders';
+      const bindings = [];
+
+      if (status) {
+        query += ' WHERE status = ?';
+        bindings.push(status);
+      }
+
+      query += ' ORDER BY id DESC LIMIT ? OFFSET ?';
+      bindings.push(limit, offset);
+
+      const result = await env.DB.prepare(query).bind(...bindings).all();
+
+      let countQuery = 'SELECT COUNT(*) as total FROM orders';
+      const countBindings = [];
+      if (status) {
+        countQuery += ' WHERE status = ?';
+        countBindings.push(status);
+      }
+      const countResult = await env.DB.prepare(countQuery).bind(...countBindings).first();
+
+      return json({
+        orders: result.results || [],
+        total: countResult?.total || 0,
+        limit,
+        offset
+      });
     } catch (e) {
       console.error('DB error:', e);
       return json({ error: 'Database error: ' + e.message }, 500);
     }
   }
 
-  // UPDATE order status
+  if (path === '/admin/stats' && method === 'GET') {
+    try {
+      const total = await env.DB.prepare('SELECT COUNT(*) as count FROM orders').first();
+      const newOrders = await env.DB.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'new'").first();
+      const confirmed = await env.DB.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'confirmed'").first();
+      const done = await env.DB.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'done'").first();
+      const cancelled = await env.DB.prepare("SELECT COUNT(*) as count FROM orders WHERE status = 'cancelled'").first();
+
+      return json({
+        total: total?.count || 0,
+        new: newOrders?.count || 0,
+        confirmed: confirmed?.count || 0,
+        done: done?.count || 0,
+        cancelled: cancelled?.count || 0
+      });
+    } catch (e) {
+      return json({ error: e.message }, 500);
+    }
+  }
+
   const patchMatch = path.match(/^\/admin\/orders\/(\d+)$/);
   if (patchMatch && method === 'PATCH') {
-    const id   = patchMatch[1];
+    const id = patchMatch[1];
     const body = await request.json();
     const ALLOWED_STATUSES = ['new', 'confirmed', 'done', 'cancelled'];
     if (!ALLOWED_STATUSES.includes(body.status)) {
@@ -49,7 +95,6 @@ export async function handleAdmin(request, env) {
     }
   }
 
-  // DELETE order
   const delMatch = path.match(/^\/admin\/orders\/(\d+)$/);
   if (delMatch && method === 'DELETE') {
     const id = delMatch[1];
@@ -63,7 +108,6 @@ export async function handleAdmin(request, env) {
     }
   }
 
-  // GET bouquets
   if (path === '/admin/bouquets' && method === 'GET') {
     try {
       const stored = await env.BOUQUETS_STORE.get('bouquets');
@@ -73,7 +117,6 @@ export async function handleAdmin(request, env) {
     }
   }
 
-  // UPDATE bouquets
   if (path === '/admin/bouquets' && method === 'PUT') {
     try {
       const body = await request.json();
@@ -100,384 +143,1134 @@ function getAdminHTML() {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Linden Blossom - Admin</title>
+  <title>Linden Blossom — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg-light: #ffffff;
-      --bg-dark: #1a1a1a;
-      --fg-light: #333333;
-      --fg-dark: #eeeeee;
-      --border-light: #e0e0e0;
-      --border-dark: #333333;
-      --accent: #7c6b5d;
-      --success: #4caf50;
-      --danger: #f44336;
+      /* Monochrome */
+      --black: #000000;
+      --charcoal: #0f0f0f;
+      --graphite: #1c1c1c;
+      --ink: #101010;
+      --slate: #4a4a4a;
+      --silver: #9ca3af;
+      --pearl: #f5f5f0;
+      --white: #ffffff;
+
+      /* Linden blossom (yellow-green) */
+      --linden: #c8d83a;
+      --linden-dark: #a8b82a;
+      --linden-deep: #8a9a1f;
+      --linden-light: #eef5d0;
+      --linden-ghost: #c8d83a69;
+
+      /* Gold */
+      --gold: #c9a227;
+      --gold-dark: #a88520;
+      --gold-light: #faf0d0;
+
+      /* Semantic */
+      --bg: var(--pearl);
+      --card: var(--white);
+      --fg: var(--charcoal);
+      --fg-muted: #6b7280;
+      --border: #e5e5e0;
+
+      /* Shadows */
+      --shadow-sm: 0 2px 8px rgba(10, 10, 10, 0.06);
+      --shadow-md: 0 8px 24px rgba(10, 10, 10, 0.08);
+      --shadow-lg: 0 16px 40px rgba(10, 10, 10, 0.12);
+      --shadow-xl: 0 28px 64px rgba(10, 10, 10, 0.18);
+      --shadow-float: 0 30px 60px rgba(0, 0, 0, 0.35);
+
+      /* Radius */
+      --radius: 12px;
+      --radius-lg: 20px;
+      --radius-xl: 28px;
+      --radius-float: 32px;
     }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
     body {
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--bg-light);
-      color: var(--fg-light);
-      transition: all 0.3s ease;
-    }
-    body.dark {
-      background: var(--bg-dark);
-      color: var(--fg-dark);
-    }
-    html, body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
       min-height: 100vh;
+      background-image:
+        radial-gradient(circle at 10% 20%, rgba(200, 216, 58, 0.04) 0%, transparent 40%),
+        radial-gradient(circle at 90% 80%, rgba(201, 162, 39, 0.03) 0%, transparent 40%);
     }
-    .container {
-      max-width: 1400px;
-      margin: 0 auto;
-      padding: 20px;
-    }
+
+    /* ============ LOGIN (monochrome only) ============ */
     .login-wrapper {
       display: flex;
       align-items: center;
       justify-content: center;
       min-height: 100vh;
-    }
-    .login-box {
-      background: var(--bg-light);
       padding: 40px;
-      border-radius: 12px;
-      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-      max-width: 400px;
+      background:
+        radial-gradient(ellipse at top left, #2d2d2d 0%, transparent 50%),
+        radial-gradient(ellipse at bottom right, #1a1a1a 0%, transparent 50%),
+        linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 50%, #2d2d2d 100%);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-wrapper::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 30%, rgba(255,255,255,0.04) 0%, transparent 40%),
+        radial-gradient(circle at 80% 70%, rgba(255,255,255,0.03) 0%, transparent 40%);
+      pointer-events: none;
+    }
+
+    .login-box {
+      position: relative;
+      background: rgba(255, 255, 255, 0.03);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
+      padding: 48px;
+      border-radius: var(--radius-float);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      max-width: 440px;
       width: 100%;
-      border: 1px solid var(--border-light);
+      box-shadow: 0 32px 64px rgba(0, 0, 0, 0.5);
     }
-    body.dark .login-box {
-      background: var(--bg-dark);
-      border-color: var(--border-dark);
+
+    .login-header { text-align: center; margin-bottom: 40px; }
+
+    .login-logo {
+      width: 72px;
+      height: 72px;
+      margin: 0 auto 20px;
+      border-radius: 20px;
+      background: linear-gradient(135deg, #2d2d2d 0%, #1a1a1a 100%);
+      border: 1px solid rgba(255,255,255,0.1);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 36px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.4);
     }
-    .login-box h1 {
-      margin-bottom: 30px;
-      text-align: center;
-      color: var(--accent);
+
+    .login-title {
+      font-size: 26px;
+      font-weight: 700;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+      margin-bottom: 6px;
     }
-    .login-box input {
+
+    .login-subtitle { font-size: 14px; color: #9ca3af; font-weight: 400; }
+    .form-group { margin-bottom: 20px; }
+
+    .form-label {
+      display: block;
+      font-size: 12px;
+      font-weight: 600;
+      color: #9ca3af;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .form-input {
       width: 100%;
-      padding: 12px 16px;
-      margin: 12px 0;
-      border: 1px solid var(--border-light);
-      border-radius: 8px;
-      background: var(--bg-light);
-      color: var(--fg-light);
-      font-size: 16px;
+      padding: 14px 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: var(--radius);
+      color: #ffffff;
+      font-size: 15px;
+      font-family: inherit;
+      transition: all 0.3s ease;
     }
-    body.dark .login-box input {
-      background: var(--bg-dark);
-      border-color: var(--border-dark);
-      color: var(--fg-dark);
+
+    .form-input::placeholder { color: #6b7280; }
+
+    .form-input:focus {
+      outline: none;
+      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(255, 255, 255, 0.07);
+      box-shadow: 0 0 0 4px rgba(255,255,255,0.05);
     }
-    .login-box button {
+
+    .btn-login {
       width: 100%;
-      padding: 12px;
-      margin: 20px 0 0 0;
-      background: var(--accent);
-      color: white;
+      padding: 15px;
+      background: #ffffff;
+      color: #0a0a0a;
       border: none;
-      border-radius: 8px;
-      font-size: 16px;
+      border-radius: var(--radius);
+      font-size: 15px;
       font-weight: 600;
       cursor: pointer;
-      transition: all 0.2s;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      margin-top: 8px;
+      letter-spacing: -0.01em;
+      font-family: inherit;
     }
-    button:hover {
-      opacity: 0.9;
+
+    .btn-login:hover {
+      background: #f5f5f0;
       transform: translateY(-2px);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.3);
     }
-    .header {
+
+    /* ============ FLOATING LAYOUT ============ */
+    .layout { min-height: 100vh; position: relative; }
+
+    /* Floating Sidebar */
+    .sidebar {
+      width: 270px;
+      background: var(--black);
+      padding: 28px 24px;
+      position: fixed;
+      top: 1%;
+      left: 1%;
+      height: 98%;
+      overflow-y: auto;
+      z-index: 100;
+      border-radius: var(--radius-float);
+      box-shadow: var(--shadow-float);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    .sidebar::-webkit-scrollbar { width: 4px; }
+    .sidebar::-webkit-scrollbar-track { background: transparent; }
+    .sidebar::-webkit-scrollbar-thumb { background: #2d2d2d; border-radius: 4px; }
+
+    .sidebar-header {
+      padding: 4px 8px 28px;
+      border-bottom: 1px solid rgba(255,255,255,0.08);
+      margin-bottom: 24px;
+    }
+
+    .sidebar-logo { display: flex; align-items: center; gap: 12px; }
+
+    .sidebar-logo-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      background: linear-gradient(135deg, var(--linden) 0%, var(--gold) 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      box-shadow: 0 6px 16px rgba(200, 216, 58, 0.3);
+    }
+
+    .sidebar-logo-text {
+      font-size: 18px;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    .sidebar-logo-sub {
+      font-size: 10px;
+      color: var(--silver);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+    }
+
+    .nav-item {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      border-radius: 16px;
+      color: var(--silver);
+      font-weight: 500;
+      font-size: 14px;
+      cursor: pointer;
+      margin-bottom: 6px;
+      transition: all 0.25s ease;
+    }
+
+    .nav-item:hover {
+      background: rgba(255,255,255,0.06);
+      color: #ffffff;
+      transform: translateX(2px);
+    }
+
+    .nav-item.active {
+      background: linear-gradient(135deg, var(--linden) 0%, var(--gold) 100%);
+      color: var(--black);
+      font-weight: 700;
+      box-shadow: 0 8px 20px rgba(200, 216, 58, 0.25);
+    }
+
+    .nav-item-icon { font-size: 18px; width: 22px; text-align: center; }
+
+    /* Main */
+    .main {
+      margin-left: calc(270px + 1% + 20px);
+      padding: calc(1% + 90px) 20px 40px 20px;
+      min-height: 100vh;
+    }
+
+    /* Floating Topbar */
+    .topbar {
+      background: var(--black);
+      padding: 14px 24px;
       display: flex;
       justify-content: space-between;
       align-items: center;
-      margin-bottom: 30px;
-      padding-bottom: 20px;
-      border-bottom: 2px solid var(--border-light);
+      position: fixed;
+      top: 1%;
+      left: calc(270px + 1% + 20px);
+      right: 1%;
+      z-index: 50;
+      border-radius: var(--radius-float);
+      box-shadow: var(--shadow-float);
+      border: 1px solid rgba(255, 255, 255, 0.04);
+      gap: 16px;
     }
-    body.dark .header {
-      border-color: var(--border-dark);
-    }
-    .header h1 {
-      color: var(--accent);
-    }
-    .header-right {
-      display: flex;
-      gap: 15px;
-      align-items: center;
-    }
-    .theme-toggle {
-      padding: 8px 16px;
-      background: var(--border-light);
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    body.dark .theme-toggle {
-      background: var(--border-dark);
-    }
-    .logout-btn {
-      background: var(--danger) !important;
-    }
-    .tabs {
-      display: flex;
-      gap: 10px;
-      margin-bottom: 25px;
-      border-bottom: 2px solid var(--border-light);
-    }
-    body.dark .tabs {
-      border-color: var(--border-dark);
-    }
-    .tab {
-      padding: 12px 24px;
+
+    .topbar-left { display: flex; align-items: center; gap: 16px; flex: 1; min-width: 0; }
+    .topbar-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+    .menu-toggle {
+      display: none;
       background: none;
       border: none;
-      border-bottom: 3px solid transparent;
+      font-size: 22px;
       cursor: pointer;
-      color: var(--fg-light);
-      font-weight: 600;
-      transition: all 0.2s;
+      color: var(--white);
     }
-    body.dark .tab {
-      color: var(--fg-dark);
+
+    .search-box { position: relative; flex: 1; max-width: 420px; }
+
+    .search-box input {
+      width: 100%;
+      padding: 12px 16px 12px 44px;
+      border: none;
+      border-radius: 16px;
+      background: var(--ink);
+      color: var(--linden);
+      font-size: 15px;
+      font-family: inherit;
+      transition: all 0.25s ease;
     }
-    .tab.active {
-      border-bottom-color: var(--accent);
-      color: var(--accent);
+
+    .search-box input::placeholder { color: var(--linden-ghost); }
+
+    .search-box input:focus {
+      outline: none;
+      background: #000;
+      box-shadow: 0 0 0 2px var(--linden-ghost);
+      color: var(--linden);
     }
-    .section {
-      background: var(--bg-light);
-      border: 1px solid var(--border-light);
+
+    .search-icon {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--linden-ghost);
+      font-size: 15px;
+      pointer-events: none;
+    }
+
+    .btn-icon {
+      width: 44px;
+      height: 44px;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: var(--ink);
+      color: var(--silver);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 16px;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .btn-icon:hover {
+      background: #000;
+      border-color: var(--linden);
+      color: var(--linden);
+      transform: translateY(-2px);
+    }
+
+    /* ============ CONTENT ============ */
+    .content {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    .page-header { margin-bottom: 28px; }
+
+    .page-title {
+      font-size: 34px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--black);
+      margin-bottom: 6px;
+    }
+
+    .page-subtitle { color: var(--fg-muted); font-size: 14px; font-weight: 400; }
+
+    /* Floating panels */
+    .float-panel {
+      background: var(--card);
+      border-radius: var(--radius-xl);
+      padding: 28px;
+      box-shadow: var(--shadow-md);
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    .float-panel:hover {
+      box-shadow: var(--shadow-xl);
+    }
+
+    /* ============ STATS GRID ============ */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 20px;
+      margin-bottom: 24px;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 26px;
+      position: relative;
+      overflow: hidden;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .stat-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+      background: linear-gradient(90deg, var(--linden), var(--gold));
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .stat-card:hover {
+      transform: translateY(-8px);
+      box-shadow: var(--shadow-xl);
+      border-color: var(--linden-light);
+    }
+
+    .stat-card:hover::before { opacity: 1; }
+
+    .stat-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 20px;
+    }
+
+    .stat-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+
+    .stat-icon.total {
+      background: linear-gradient(135deg, var(--linden-light) 0%, var(--gold-light) 100%);
+      color: var(--black);
+    }
+    .stat-icon.new {
+      background: linear-gradient(135deg, var(--linden-light) 0%, var(--linden) 100%);
+      color: var(--linden-deep);
+    }
+    .stat-icon.confirmed {
+      background: linear-gradient(135deg, var(--gold-light) 0%, var(--gold) 100%);
+      color: var(--gold-dark);
+    }
+    .stat-icon.done {
+      background: linear-gradient(135deg, #e8e8e8 0%, #cfcfcf 100%);
+      color: var(--slate);
+    }
+
+    .stat-label {
+      font-size: 11px;
+      color: var(--fg-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      margin-bottom: 10px;
+    }
+
+    .stat-value {
+      font-size: 36px;
+      font-weight: 800;
+      color: var(--black);
+      letter-spacing: -0.03em;
+    }
+
+    /* ============ VIEW CONTROLS ============ */
+    .view-controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .view-switcher {
+      display: flex;
+      gap: 4px;
+      background: var(--black);
+      border-radius: 16px;
+      padding: 4px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .view-btn {
+      padding: 10px 20px;
+      border: none;
+      background: none;
       border-radius: 12px;
-      padding: 25px;
-      margin-bottom: 20px;
-      display: none;
-    }
-    body.dark .section {
-      background: var(--bg-dark);
-      border-color: var(--border-dark);
-    }
-    .section.active {
-      display: block;
-    }
-    .section h2 {
-      margin-bottom: 20px;
-      color: var(--accent);
-    }
-    .table-wrapper {
-      overflow-x: auto;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    thead {
-      background: var(--border-light);
-    }
-    body.dark thead {
-      background: var(--border-dark);
-    }
-    th {
-      padding: 15px;
-      text-align: left;
+      cursor: pointer;
+      color: var(--silver);
       font-weight: 600;
-      color: var(--accent);
-    }
-    td {
-      padding: 15px;
-      border-bottom: 1px solid var(--border-light);
-    }
-    body.dark td {
-      border-color: var(--border-dark);
-    }
-    tr:hover {
-      background: var(--border-light);
-    }
-    body.dark tr:hover {
-      background: var(--border-dark);
-    }
-    button.btn-small {
-      padding: 6px 12px;
-      font-size: 12px;
-      border: none;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: all 0.2s;
-    }
-    .btn-delete {
-      background: var(--danger);
-      color: white;
-    }
-    .btn-primary {
-      background: var(--accent);
-      color: white;
-      padding: 12px 24px;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      margin: 10px 5px 10px 0;
-    }
-    textarea {
-      width: 100%;
-      padding: 12px;
-      border: 1px solid var(--border-light);
-      border-radius: 8px;
-      background: var(--bg-light);
-      color: var(--fg-light);
-      font-family: monospace;
       font-size: 13px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.25s ease;
+      font-family: inherit;
+    }
+
+    .view-btn:hover { color: #ffffff; }
+
+    .view-btn.active {
+      background: linear-gradient(135deg, var(--linden) 0%, var(--gold) 100%);
+      color: var(--black);
+      box-shadow: 0 4px 12px rgba(200, 216, 58, 0.3);
+    }
+
+    .filter-controls { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+    .filter-select {
+      padding: 10px 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--white);
+      color: var(--fg);
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.25s ease;
+      font-weight: 500;
+    }
+
+    .filter-select:focus {
+      outline: none;
+      border-color: var(--linden);
+      box-shadow: 0 0 0 3px var(--linden-light);
+    }
+
+    .btn-primary {
+      padding: 11px 22px;
+      background: var(--black);
+      color: var(--linden);
+      border: none;
+      border-radius: 12px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      font-family: inherit;
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-primary:hover {
+      background: linear-gradient(135deg, var(--linden) 0%, var(--gold) 100%);
+      color: var(--black);
+      transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(200, 216, 58, 0.25);
+    }
+
+    /* ============ TABLE VIEW ============ */
+    .table-container {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    .table-wrapper { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+
+    thead { background: var(--pearl); border-bottom: 2px solid var(--border); }
+
+    th {
+      padding: 18px 24px;
+      text-align: left;
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--slate);
+    }
+
+    td { padding: 20px 24px; border-bottom: 1px solid var(--border); font-size: 14px; }
+
+    tbody tr { transition: all 0.25s ease; }
+    tbody tr:hover { background: var(--pearl); }
+    tbody tr:last-child td { border-bottom: none; }
+
+    /* ============ STATUS BADGES ============ */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .status-badge.new {
+      background: var(--linden-light);
+      color: var(--linden-deep);
+      border: 1px solid var(--linden);
+    }
+
+    .status-badge.confirmed {
+      background: var(--gold-light);
+      color: var(--gold-dark);
+      border: 1px solid var(--gold);
+    }
+
+    .status-badge.done {
+      background: #e8e8e8;
+      color: var(--slate);
+      border: 1px solid #cfcfcf;
+    }
+
+    .status-badge.cancelled {
+      background: #fee;
+      color: #991b1b;
+      border: 1px solid #fbb;
+    }
+
+    .status-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+    /* ============ CARD VIEW ============ */
+    .card-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .order-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 26px;
+      transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .order-card:hover {
+      transform: translateY(-8px);
+      box-shadow: var(--shadow-xl);
+      border-color: var(--linden-light);
+    }
+
+    .order-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+      gap: 12px;
+    }
+
+    .order-id {
+      font-size: 11px;
+      color: var(--fg-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      font-weight: 700;
+      margin-bottom: 4px;
+    }
+
+    .order-name {
+      font-size: 18px;
+      font-weight: 800;
+      color: var(--black);
+      letter-spacing: -0.02em;
+      margin-bottom: 4px;
+    }
+
+    .order-phone { font-size: 13px; color: var(--fg-muted); }
+
+    .order-card-body {
+      margin: 16px 0;
+      padding: 16px 0;
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .order-detail {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      font-size: 13px;
+    }
+
+    .order-detail:last-child { margin-bottom: 0; }
+    .order-detail-label { color: var(--fg-muted); font-weight: 500; }
+    .order-card-footer { display: flex; gap: 8px; }
+
+    /* ============ LIST VIEW ============ */
+    .list-container {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      box-shadow: var(--shadow-md);
+    }
+
+    .list-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 20px 24px;
+      border-bottom: 1px solid var(--border);
+      transition: all 0.25s ease;
+      gap: 16px;
+    }
+
+    .list-item:hover { background: var(--pearl); }
+    .list-item:last-child { border-bottom: none; }
+
+    .list-item-left {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      flex: 1;
+      min-width: 0;
+    }
+
+    .list-item-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 16px;
+      background: linear-gradient(135deg, var(--linden-light), var(--gold-light));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      flex-shrink: 0;
+    }
+
+    .list-item-info { min-width: 0; }
+
+    .list-item-info h4 {
+      font-size: 15px;
+      font-weight: 800;
+      color: var(--black);
+      margin-bottom: 3px;
+      letter-spacing: -0.01em;
+    }
+
+    .list-item-info p {
+      font-size: 12px;
+      color: var(--fg-muted);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .list-item-right {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-shrink: 0;
+    }
+
+    /* ============ ACTION BUTTONS ============ */
+    .action-btn {
+      width: 38px;
+      height: 38px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: var(--white);
+      color: var(--fg-muted);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.25s ease;
+      flex-shrink: 0;
+    }
+
+    .action-btn:hover {
+      border-color: var(--linden);
+      color: var(--black);
+      transform: translateY(-2px);
+      box-shadow: var(--shadow-md);
+    }
+
+    .action-btn.danger:hover {
+      background: #fee;
+      border-color: #991b1b;
+      color: #991b1b;
+    }
+
+    /* ============ BOUQUETS ============ */
+    .bouquets-container {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      padding: 28px;
+      box-shadow: var(--shadow-md);
+    }
+
+    .bouquets-toolbar {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .json-editor {
+      width: 100%;
+      min-height: 500px;
+      padding: 22px;
+      border: 1px solid #1c1c1c;
+      border-radius: var(--radius-lg);
+      background: var(--charcoal);
+      color: var(--linden);
+      font-family: 'SF Mono', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.7;
       resize: vertical;
-      margin: 15px 0;
+      transition: all 0.25s ease;
     }
-    body.dark textarea {
-      background: var(--bg-dark);
-      border-color: var(--border-dark);
-      color: var(--fg-dark);
+
+    .json-editor:focus {
+      outline: none;
+      border-color: var(--linden);
+      box-shadow: 0 0 0 3px var(--linden-ghost);
     }
-    .error {
-      color: var(--danger);
-      margin: 10px 0;
-      padding: 10px 15px;
-      background: rgba(244, 67, 54, 0.1);
-      border-radius: 6px;
-      border-left: 3px solid var(--danger);
+
+    /* ============ ALERTS ============ */
+    .alert {
+      padding: 14px 18px;
+      border-radius: 16px;
+      margin-top: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      font-weight: 500;
     }
-    .success {
-      color: var(--success);
-      margin: 10px 0;
-      padding: 10px 15px;
-      background: rgba(76, 175, 80, 0.1);
-      border-radius: 6px;
-      border-left: 3px solid var(--success);
+
+    .alert-success {
+      background: var(--linden-light);
+      color: var(--linden-deep);
+      border: 1px solid var(--linden);
     }
-    .hidden {
-      display: none !important;
+
+    .alert-error {
+      background: #fee;
+      color: #991b1b;
+      border: 1px solid #fbb;
     }
-    select {
-      padding: 8px;
-      border: 1px solid var(--border-light);
-      border-radius: 6px;
-      background: var(--bg-light);
-      color: var(--fg-light);
+
+    .hidden { display: none !important; }
+    .section { display: none; }
+    .section.active { display: block; animation: fadeIn 0.3s ease; }
+
+    /* ============ RESPONSIVE ============ */
+    @media (max-width: 1024px) {
+      .sidebar {
+        transform: translateX(calc(-100% - 20px));
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .main {
+        margin-left: 0;
+        padding: calc(1% + 90px) 16px 40px 16px;
+      }
+      .topbar {
+        left: 1%;
+        right: 1%;
+      }
+      .menu-toggle { display: flex; }
     }
-    body.dark select {
-      background: var(--bg-dark);
-      border-color: var(--border-dark);
-      color: var(--fg-dark);
-    }
+
     @media (max-width: 768px) {
-      .header { flex-direction: column; gap: 15px; }
-      .tabs { flex-wrap: wrap; }
-      table { font-size: 12px; }
-      th, td { padding: 10px; }
+      .topbar { padding: 12px 16px; }
+      .view-controls { flex-direction: column; align-items: stretch; }
+      .stats-grid { grid-template-columns: 1fr 1fr; }
+      .card-grid { grid-template-columns: 1fr; }
+      .page-title { font-size: 26px; }
+      .content { padding: 0 4px; }
     }
+
+    @media (max-width: 480px) {
+      .stats-grid { grid-template-columns: 1fr; }
+      .login-wrapper { padding: 20px; }
+      .login-box { padding: 32px 24px; }
+      .view-switcher { width: 100%; justify-content: space-between; }
+    }
+
+    /* ============ ANIMATIONS ============ */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .fade-in { animation: fadeIn 0.4s cubic-bezier(0.4, 0, 0.2, 1); }
+
+    .loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 60px;
+      color: var(--fg-muted);
+      font-size: 14px;
+    }
+
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 2.5px solid var(--border);
+      border-top-color: var(--linden);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin-right: 12px;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: var(--pearl); }
+    ::-webkit-scrollbar-thumb { background: #d4d4cf; border-radius: 10px; border: 2px solid var(--pearl); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--linden); }
   </style>
 </head>
 <body>
   <div id="loginWrapper" class="login-wrapper">
     <div class="login-box">
-      <h1>🌸 Linden Admin</h1>
+      <div class="login-header">
+        <div class="login-logo">🌸</div>
+        <h1 class="login-title">Linden Blossom</h1>
+        <p class="login-subtitle">Admin Dashboard</p>
+      </div>
       <form onsubmit="event.preventDefault(); login();">
-        <input type="text" id="user" placeholder="admin" value="admin" autocomplete="username">
-        <input type="password" id="pass" placeholder="Password" autocomplete="current-password">
-        <button type="submit">Login</button>
+        <div class="form-group">
+          <label class="form-label">Username</label>
+          <input type="text" id="user" class="form-input" placeholder="admin" value="admin" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Password</label>
+          <input type="password" id="pass" class="form-input" placeholder="Enter password" autocomplete="current-password">
+        </div>
+        <button type="submit" class="btn-login">Sign In</button>
       </form>
-      <div id="loginError" class="error hidden"></div>
+      <div id="loginError" class="alert alert-error hidden"></div>
     </div>
   </div>
 
   <div id="panel" class="hidden">
-    <div class="container">
-      <div class="header">
-        <h1>🌸 Linden Blossom Admin</h1>
-        <div class="header-right">
-          <button class="theme-toggle" onclick="toggleTheme()">🌙 Theme</button>
-          <button class="logout-btn" onclick="logout()">Logout</button>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+          <div class="sidebar-logo">
+            <div class="sidebar-logo-icon">🌸</div>
+            <div>
+              <div class="sidebar-logo-text">Linden</div>
+              <div class="sidebar-logo-sub">Admin Panel</div>
+            </div>
+          </div>
         </div>
-      </div>
+        <nav>
+          <div class="nav-item active" data-tab="orders" onclick="switchTab('orders')">
+            <span class="nav-item-icon">📦</span><span>Orders</span>
+          </div>
+          <div class="nav-item" data-tab="bouquets" onclick="switchTab('bouquets')">
+            <span class="nav-item-icon">🌹</span><span>Bouquets</span>
+          </div>
+        </nav>
+      </aside>
 
-      <div class="tabs">
-        <button class="tab active" onclick="switchTab('orders')">📦 Orders</button>
-        <button class="tab" onclick="switchTab('bouquets')">🌹 Bouquets</button>
-      </div>
-
-      <section id="orders" class="section active">
-        <h2>Orders Management</h2>
-        <button class="btn-primary" onclick="refreshOrders()">🔄 Refresh</button>
-        <div class="table-wrapper">
-          <table>
-            <thead>
-              <tr>
-                <th>ID</th>
-                <th>Order #</th>
-                <th>Name</th>
-                <th>Phone</th>
-                <th>Bouquet</th>
-                <th>Status</th>
-                <th>Date</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody id="ordersTbody"></tbody>
-          </table>
+      <main class="main">
+        <div class="topbar">
+          <div class="topbar-left">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <div class="search-box">
+              <span class="search-icon">🔍</span>
+              <input type="text" id="searchInput" placeholder="Search orders, bouquets..." oninput="searchOrders()">
+            </div>
+          </div>
+          <div class="topbar-right">
+            <button class="btn-icon" onclick="logout()" title="Logout">🚪</button>
+          </div>
         </div>
-        <div id="ordersError" class="error hidden"></div>
-      </section>
 
-      <section id="bouquets" class="section">
-        <h2>Bouquets Management</h2>
-        <button class="btn-primary" onclick="refreshBouquets()">🔄 Refresh</button>
-        <button class="btn-primary" onclick="formatBouquets()">✨ Format</button>
-        <button class="btn-primary" onclick="saveBouquets()">💾 Save</button>
-        <textarea id="bouquetsEditor" rows="20"></textarea>
-        <div id="bouquetsError" class="error hidden"></div>
-        <div id="bouquetsSuccess" class="success hidden"></div>
-      </section>
+        <div class="content">
+          <section id="orders" class="section active">
+            <div class="page-header">
+              <h1 class="page-title">Orders Management</h1>
+              <p class="page-subtitle">Manage and track all customer orders</p>
+            </div>
+
+            <div class="stats-grid">
+              <div class="stat-card fade-in">
+                <div class="stat-header">
+                  <div>
+                    <div class="stat-label">Total Orders</div>
+                    <div class="stat-value" id="statTotal">0</div>
+                  </div>
+                  <div class="stat-icon total">📊</div>
+                </div>
+              </div>
+              <div class="stat-card fade-in">
+                <div class="stat-header">
+                  <div>
+                    <div class="stat-label">New Orders</div>
+                    <div class="stat-value" id="statNew">0</div>
+                  </div>
+                  <div class="stat-icon new">🆕</div>
+                </div>
+              </div>
+              <div class="stat-card fade-in">
+                <div class="stat-header">
+                  <div>
+                    <div class="stat-label">Confirmed</div>
+                    <div class="stat-value" id="statConfirmed">0</div>
+                  </div>
+                  <div class="stat-icon confirmed">✓</div>
+                </div>
+              </div>
+              <div class="stat-card fade-in">
+                <div class="stat-header">
+                  <div>
+                    <div class="stat-label">Completed</div>
+                    <div class="stat-value" id="statDone">0</div>
+                  </div>
+                  <div class="stat-icon done">✓</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="view-controls">
+              <div class="view-switcher">
+                <button class="view-btn active" data-view="table" onclick="switchView('table')">
+                  <span>▦</span><span>Table</span>
+                </button>
+                <button class="view-btn" data-view="card" onclick="switchView('card')">
+                  <span>◫</span><span>Cards</span>
+                </button>
+                <button class="view-btn" data-view="list" onclick="switchView('list')">
+                  <span>≡</span><span>List</span>
+                </button>
+              </div>
+              <div class="filter-controls">
+                <select class="filter-select" id="statusFilter" onchange="filterOrders()">
+                  <option value="">All Status</option>
+                  <option value="new">New</option>
+                  <option value="confirmed">Confirmed</option>
+                  <option value="done">Done</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <button class="btn-primary" onclick="refreshOrders()">
+                  <span>↻</span><span>Refresh</span>
+                </button>
+              </div>
+            </div>
+
+            <div id="ordersContainer">
+              <div class="loading">
+                <div class="spinner"></div><span>Loading orders...</span>
+              </div>
+            </div>
+
+            <div id="ordersError" class="alert alert-error hidden"></div>
+          </section>
+
+          <section id="bouquets" class="section">
+            <div class="page-header">
+              <h1 class="page-title">Bouquets Management</h1>
+              <p class="page-subtitle">Edit and manage your bouquet catalog</p>
+            </div>
+
+            <div class="bouquets-container">
+              <div class="bouquets-toolbar">
+                <button class="btn-primary" onclick="refreshBouquets()">
+                  <span>↻</span><span>Refresh</span>
+                </button>
+                <button class="btn-primary" onclick="formatBouquets()">
+                  <span>✦</span><span>Format</span>
+                </button>
+                <button class="btn-primary" onclick="saveBouquets()">
+                  <span>✓</span><span>Save</span>
+                </button>
+              </div>
+              <textarea id="bouquetsEditor" class="json-editor" placeholder="Loading bouquets..."></textarea>
+              <div id="bouquetsError" class="alert alert-error hidden"></div>
+              <div id="bouquetsSuccess" class="alert alert-success hidden"></div>
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   </div>
 
   <script>
     let auth = '';
-    let theme = localStorage.getItem('theme') || 'light';
-    if (theme === 'dark') document.body.classList.add('dark');
+    let orders = [];
+    let currentView = 'table';
 
-    function toggleTheme() {
-      theme = theme === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('theme', theme);
-      document.body.classList.toggle('dark');
+    function toggleSidebar() {
+      document.getElementById('sidebar').classList.toggle('open');
     }
 
     function login() {
       const u = document.getElementById('user').value;
       const p = document.getElementById('pass').value;
-      if (!u || !p) {
-        showLoginError('Username and password required');
-        return;
-      }
+      if (!u || !p) { showLoginError('Username and password required'); return; }
       auth = 'Basic ' + btoa(u + ':' + p);
       localStorage.setItem('admin_user', u);
       localStorage.setItem('admin_pass', p);
-      // Verify auth works by fetching orders
+
       fetch('/admin/orders', { headers: { Authorization: auth } })
-        .then(r => {
-          if (!r.ok) throw new Error('Login failed: invalid credentials');
-          return r.json();
-        })
+        .then(r => { if (!r.ok) throw new Error('Invalid credentials'); return r.json(); })
         .then(() => {
           document.getElementById('loginWrapper').classList.add('hidden');
           document.getElementById('panel').classList.remove('hidden');
           refreshOrders();
+          refreshStats();
         })
-        .catch(e => {
-          showLoginError(e.message);
-          auth = '';
-        });
+        .catch(e => { showLoginError(e.message); auth = ''; });
     }
 
     function logout() {
@@ -490,97 +1283,192 @@ function getAdminHTML() {
 
     function showLoginError(msg) {
       const err = document.getElementById('loginError');
-      err.textContent = msg;
+      err.textContent = '❌ ' + msg;
       err.classList.remove('hidden');
+      setTimeout(() => err.classList.add('hidden'), 4000);
     }
 
     function switchTab(tab) {
-      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.nav-item').forEach(t => t.classList.remove('active'));
       document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
-      event.target.classList.add('active');
+      const navItem = document.querySelector('[data-tab="' + tab + '"]');
+      if (navItem) navItem.classList.add('active');
       document.getElementById(tab).classList.add('active');
       if (tab === 'bouquets') refreshBouquets();
+      if (window.innerWidth <= 1024) document.getElementById('sidebar').classList.remove('open');
+    }
+
+    function switchView(view) {
+      currentView = view;
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      const btn = document.querySelector('[data-view="' + view + '"]');
+      if (btn) btn.classList.add('active');
+      renderOrders(orders);
+    }
+
+    function searchOrders() {
+      const q = document.getElementById('searchInput').value.toLowerCase();
+      const filtered = orders.filter(o =>
+        o.name.toLowerCase().includes(q) ||
+        o.phone.toLowerCase().includes(q) ||
+        (o.bouquet && o.bouquet.toLowerCase().includes(q)) ||
+        (o.order_id && String(o.order_id).toLowerCase().includes(q))
+      );
+      renderOrders(filtered);
+    }
+
+    function filterOrders() {
+      const s = document.getElementById('statusFilter').value;
+      const filtered = s ? orders.filter(o => o.status === s) : orders;
+      renderOrders(filtered);
     }
 
     async function refreshOrders() {
       try {
         if (!auth) throw new Error('Not logged in');
         const r = await fetch('/admin/orders', { headers: { Authorization: auth } });
-        if (!r.ok) throw new Error('Auth failed (401) - check your password');
+        if (!r.ok) throw new Error('Auth failed');
         const d = await r.json();
-        renderOrders(d);
-      } catch (e) {
-        showError('ordersError', e.message);
-      }
+        orders = d.orders || d;
+        renderOrders(orders);
+      } catch (e) { showError('ordersError', e.message); }
     }
 
-    function renderOrders(orders) {
-      const tbody = document.getElementById('ordersTbody');
-      tbody.innerHTML = orders.map(o => \`<tr>
-        <td>\${o.id}</td>
-        <td>\${o.order_id || '?'}</td>
-        <td>\${o.name}</td>
-        <td>\${o.phone}</td>
-        <td>\${o.bouquet || '-'}</td>
-        <td>
-          <select onchange="updateStatus(\${o.id},this.value)">
-            <option value="">--</option>
-            <option value="new" \${o.status === 'new' ? 'selected' : ''}>new</option>
-            <option value="confirmed" \${o.status === 'confirmed' ? 'selected' : ''}>confirmed</option>
-            <option value="done" \${o.status === 'done' ? 'selected' : ''}>done</option>
-            <option value="cancelled" \${o.status === 'cancelled' ? 'selected' : ''}>cancelled</option>
-          </select>
-        </td>
-        <td>\${o.created_at}</td>
-        <td><button class="btn-small btn-delete" onclick="deleteOrder(\${o.id})">×</button></td>
-      </tr>\`).join('');
+    async function refreshStats() {
+      try {
+        if (!auth) return;
+        const r = await fetch('/admin/stats', { headers: { Authorization: auth } });
+        if (!r.ok) return;
+        const s = await r.json();
+        document.getElementById('statTotal').textContent = s.total || 0;
+        document.getElementById('statNew').textContent = s.new || 0;
+        document.getElementById('statConfirmed').textContent = s.confirmed || 0;
+        document.getElementById('statDone').textContent = s.done || 0;
+      } catch (e) { console.error('Stats error:', e); }
+    }
+
+    function renderOrders(list) {
+      const c = document.getElementById('ordersContainer');
+      if (!list.length) { c.innerHTML = '<div class="loading">No orders found</div>'; return; }
+      if (currentView === 'table') c.innerHTML = renderTable(list);
+      else if (currentView === 'card') c.innerHTML = renderCards(list);
+      else c.innerHTML = renderList(list);
+    }
+
+    function renderTable(list) {
+      let rows = '';
+      for (const o of list) {
+        const oid = o.order_id || o.id;
+        const bouquet = o.bouquet || '—';
+        rows += '<tr>' +
+          '<td><strong>' + oid + '</strong></td>' +
+          '<td>' + o.name + '</td>' +
+          '<td>' + o.phone + '</td>' +
+          '<td>' + bouquet + '</td>' +
+          '<td><span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span></td>' +
+          '<td>' + o.created_at + '</td>' +
+          '<td><div style="display:flex;gap:8px;align-items:center;">' +
+            '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)" style="min-width:130px;">' +
+              '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
+              '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
+              '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
+              '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+            '</select>' +
+            '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')" title="Delete">🗑</button>' +
+          '</div></td></tr>';
+      }
+      return '<div class="table-container fade-in"><div class="table-wrapper"><table><thead><tr>' +
+        '<th>Order ID</th><th>Customer</th><th>Phone</th><th>Bouquet</th>' +
+        '<th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>' + rows +
+        '</tbody></table></div></div>';
+    }
+
+    function renderCards(list) {
+      let cards = '';
+      for (const o of list) {
+        cards += '<div class="order-card">' +
+          '<div class="order-card-header"><div>' +
+            '<div class="order-id">Order #' + (o.order_id || o.id) + '</div>' +
+            '<div class="order-name">' + o.name + '</div>' +
+            '<div class="order-phone">📞 ' + o.phone + '</div>' +
+          '</div>' +
+          '<span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span></div>' +
+          '<div class="order-card-body">' +
+            '<div class="order-detail"><span class="order-detail-label">Bouquet</span><span>' + (o.bouquet || '—') + '</span></div>' +
+            '<div class="order-detail"><span class="order-detail-label">Message</span><span>' + (o.message || '—') + '</span></div>' +
+            '<div class="order-detail"><span class="order-detail-label">Date</span><span>' + o.created_at + '</span></div>' +
+          '</div>' +
+          '<div class="order-card-footer">' +
+            '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)" style="flex:1;">' +
+              '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
+              '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
+              '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
+              '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+            '</select>' +
+            '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')">🗑</button>' +
+          '</div></div>';
+      }
+      return '<div class="card-grid fade-in">' + cards + '</div>';
+    }
+
+    function renderList(list) {
+      let items = '';
+      for (const o of list) {
+        items += '<div class="list-item">' +
+          '<div class="list-item-left"><div class="list-item-icon">📦</div>' +
+          '<div class="list-item-info"><h4>' + o.name + '</h4>' +
+          '<p>📞 ' + o.phone + ' · 🌸 ' + (o.bouquet || 'No bouquet') + ' · 📅 ' + o.created_at + '</p></div></div>' +
+          '<div class="list-item-right">' +
+            '<span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span>' +
+            '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)">' +
+              '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
+              '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
+              '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
+              '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+            '</select>' +
+            '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')">🗑</button>' +
+          '</div></div>';
+      }
+      return '<div class="list-container fade-in">' + items + '</div>';
     }
 
     async function updateStatus(id, status) {
       if (!status) return;
       try {
-        const r = await fetch(\`/admin/orders/\${id}\`, {
+        const r = await fetch('/admin/orders/' + id, {
           method: 'PATCH',
           headers: { Authorization: auth, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status })
+          body: JSON.stringify({ status: status })
         });
-        if (!r.ok) throw new Error('Failed');
-        refreshOrders();
-      } catch (e) {
-        showError('ordersError', e.message);
-      }
+        if (!r.ok) throw new Error('Update failed');
+        refreshOrders(); refreshStats();
+      } catch (e) { showError('ordersError', e.message); }
     }
 
     async function deleteOrder(id) {
-      if (!confirm('Delete order?')) return;
+      if (!confirm('Delete this order?')) return;
       try {
-        const r = await fetch(\`/admin/orders/\${id}\`, { method: 'DELETE', headers: { Authorization: auth } });
-        if (!r.ok) throw new Error('Failed');
-        refreshOrders();
-      } catch (e) {
-        showError('ordersError', e.message);
-      }
+        const r = await fetch('/admin/orders/' + id, { method: 'DELETE', headers: { Authorization: auth } });
+        if (!r.ok) throw new Error('Delete failed');
+        refreshOrders(); refreshStats();
+      } catch (e) { showError('ordersError', e.message); }
     }
 
     async function refreshBouquets() {
       try {
         if (!auth) throw new Error('Not logged in');
         const r = await fetch('/admin/bouquets', { headers: { Authorization: auth } });
-        if (!r.ok) throw new Error('Auth failed (401) - check your password');
-        const d = await r.json();
-        document.getElementById('bouquetsEditor').value = JSON.stringify(d, null, 2);
-      } catch (e) {
-        showError('bouquetsError', e.message);
-      }
+        if (!r.ok) throw new Error('Auth failed');
+        document.getElementById('bouquetsEditor').value = JSON.stringify(await r.json(), null, 2);
+      } catch (e) { showError('bouquetsError', e.message); }
     }
 
     function formatBouquets() {
       try {
         const e = document.getElementById('bouquetsEditor');
         e.value = JSON.stringify(JSON.parse(e.value), null, 2);
-      } catch (e) {
-        showError('bouquetsError', e.message);
-      }
+        hideError('bouquetsError');
+      } catch (e) { showError('bouquetsError', 'Invalid JSON: ' + e.message); }
     }
 
     async function saveBouquets() {
@@ -591,25 +1479,27 @@ function getAdminHTML() {
           headers: { Authorization: auth, 'Content-Type': 'application/json' },
           body: JSON.stringify(data)
         });
-        if (!r.ok) throw new Error('Failed: ' + r.status);
+        if (!r.ok) throw new Error('Failed');
         showSuccess('bouquetsSuccess', '✓ Saved ' + data.length + ' bouquets');
-      } catch (e) {
-        showError('bouquetsError', e.message);
-      }
+        hideError('bouquetsError');
+      } catch (e) { showError('bouquetsError', e.message); }
     }
 
     function showError(id, msg) {
       const el = document.getElementById(id);
       el.textContent = '❌ ' + msg;
       el.classList.remove('hidden');
+      setTimeout(() => el.classList.add('hidden'), 4000);
     }
 
     function showSuccess(id, msg) {
       const el = document.getElementById(id);
       el.textContent = msg;
       el.classList.remove('hidden');
-      setTimeout(() => el.classList.add('hidden'), 3000);
+      setTimeout(() => el.classList.add('hidden'), 4000);
     }
+
+    function hideError(id) { document.getElementById(id).classList.add('hidden'); }
 
     window.addEventListener('load', () => {
       const u = localStorage.getItem('admin_user');
