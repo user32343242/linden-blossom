@@ -882,7 +882,7 @@ async function loadBouquets() {
     BOUQUETS_RAW = FALLBACK_BOUQUETS();
   }
   state.sortedBouquets = buildBouquets(state.lang, state.currency);
-  renderAll(); // перерисовать каталог
+  renderCurrentView();
 }
 
 function buildBouquets(lang, currency) {

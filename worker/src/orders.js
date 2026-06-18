@@ -19,6 +19,33 @@ export async function handleOrders(request, env) {
       return json({ error: 'name and phone are required' }, 422);
     }
 
+    // Инициализировать таблицу, если не существует
+    try {
+      await env.DB.prepare(`
+        CREATE TABLE IF NOT EXISTS orders (
+          id          INTEGER PRIMARY KEY AUTOINCREMENT,
+          order_id    TEXT UNIQUE,
+          seq_num     INTEGER NOT NULL,
+          phone       TEXT NOT NULL,
+          name        TEXT NOT NULL,
+          bouquet     TEXT NOT NULL DEFAULT '',
+          message     TEXT NOT NULL DEFAULT '',
+          status      TEXT NOT NULL DEFAULT 'new',
+          created_at  TEXT NOT NULL DEFAULT (datetime('now'))
+        )
+      `).run();
+      
+      await env.DB.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_orders_phone ON orders(phone)
+      `).run();
+      
+      await env.DB.prepare(`
+        CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status)
+      `).run();
+    } catch (err) {
+      console.warn('Schema init (table may already exist):', err.message);
+    }
+
     // Rate limit: максимум 3 заказа в час с одного IP
     const ip      = request.headers.get('CF-Connecting-IP');
     const rlKey   = `rl:${ip}`;
