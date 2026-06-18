@@ -1,12 +1,170 @@
-{
-  "bouquets": [
-    { "id": "LB-0042", "price": 4500, "emoji": "🌹", "popularity": 95, "size": { "ru": "Средний (45 см)", "en": "Medium (45 cm)", "zh": "中号 (45厘米)" }, "freshness": { "ru": "7-10 дней", "en": "7-10 days", "zh": "7-10天" }, "wrap": { "ru": "Крафт + лента", "en": "Kraft + ribbon", "zh": "牛皮纸 + 丝带" } },
-    { "id": "LB-0043", "price": 6200, "emoji": "🌷", "popularity": 88, "size": { "ru": "Большой (55 см)", "en": "Large (55 cm)", "zh": "大号 (55厘米)" }, "freshness": { "ru": "5-7 дней", "en": "5-7 days", "zh": "5-7天" }, "wrap": { "ru": "Тишью + коробка", "en": "Tissue + box", "zh": "薄纸 + 盒子" } },
-    { "id": "LB-0044", "price": 5800, "emoji": "🌺", "popularity": 76, "size": { "ru": "Средний (50 см)", "en": "Medium (50 cm)", "zh": "中号 (50厘米)" }, "freshness": { "ru": "7-10 дней", "en": "7-10 days", "zh": "7-10天" }, "wrap": { "ru": "Эко-бумага", "en": "Eco paper", "zh": "环保纸" } },
-    { "id": "LB-0045", "price": 3900, "emoji": "🌻", "popularity": 92, "size": { "ru": "Большой (60 см)", "en": "Large (60 cm)", "zh": "大号 (60厘米)" }, "freshness": { "ru": "10-14 дней", "en": "10-14 days", "zh": "10-14天" }, "wrap": { "ru": "Джутовый шпагат", "en": "Jute twine", "zh": "黄麻绳" } },
-    { "id": "LB-0046", "price": 4200, "emoji": "🌼", "popularity": 81, "size": { "ru": "Средний (45 см)", "en": "Medium (45 cm)", "zh": "中号 (45厘米)" }, "freshness": { "ru": "5-7 дней", "en": "5-7 days", "zh": "5-7天" }, "wrap": { "ru": "Лён", "en": "Linen", "zh": "亚麻" } },
-    { "id": "LB-0047", "price": 5500, "emoji": "💐", "popularity": 99, "size": { "ru": "Большой (55 см)", "en": "Large (55 cm)", "zh": "大号 (55厘米)" }, "freshness": { "ru": "7-10 дней", "en": "7-10 days", "zh": "7-10天" }, "wrap": { "ru": "Шёлковая лента", "en": "Silk ribbon", "zh": "丝带" } },
-    { "id": "LB-0048", "price": 3200, "emoji": "🌾", "popularity": 70, "size": { "ru": "Средний (40 см)", "en": "Medium (40 cm)", "zh": "中号 (40厘米)" }, "freshness": { "ru": "3-5 дней", "en": "3-5 days", "zh": "3-5天" }, "wrap": { "ru": "Бечёвка", "en": "Twine", "zh": "麻绳" } },
-    { "id": "LB-0049", "price": 7800, "emoji": "🌸", "popularity": 85, "size": { "ru": "Премиум (65 см)", "en": "Premium (65 cm)", "zh": "高级 (65厘米)" }, "freshness": { "ru": "5-7 дней", "en": "5-7 days", "zh": "5-7天" }, "wrap": { "ru": "Бархатная коробка", "en": "Velvet box", "zh": "天鹅绒盒" } }
-  ]
-}
+[
+  {
+    "id": "LB-0042",
+    "price": 4500,
+    "emoji": "🌹",
+    "popularity": 95,
+    "size": {
+      "ru": "Средний (45 см)",
+      "en": "Medium (45 cm)",
+      "zh": "中号 (45厘米)"
+    },
+    "freshness": {
+      "ru": "7-10 дней",
+      "en": "7-10 days",
+      "zh": "7-10天"
+    },
+    "wrap": {
+      "ru": "Крафт + лента",
+      "en": "Kraft + ribbon",
+      "zh": "牛皮纸 + 丝带"
+    }
+  },
+  {
+    "id": "LB-0043",
+    "price": 6200,
+    "emoji": "🌷",
+    "popularity": 88,
+    "size": {
+      "ru": "Большой (55 см)",
+      "en": "Large (55 cm)",
+      "zh": "大号 (55厘米)"
+    },
+    "freshness": {
+      "ru": "5-7 дней",
+      "en": "5-7 days",
+      "zh": "5-7天"
+    },
+    "wrap": {
+      "ru": "Тишью + коробка",
+      "en": "Tissue + box",
+      "zh": "薄纸 + 盒子"
+    }
+  },
+  {
+    "id": "LB-0044",
+    "price": 5800,
+    "emoji": "🌺",
+    "popularity": 76,
+    "size": {
+      "ru": "Средний (50 см)",
+      "en": "Medium (50 cm)",
+      "zh": "中号 (50厘米)"
+    },
+    "freshness": {
+      "ru": "7-10 дней",
+      "en": "7-10 days",
+      "zh": "7-10天"
+    },
+    "wrap": {
+      "ru": "Эко-бумага",
+      "en": "Eco paper",
+      "zh": "环保纸"
+    }
+  },
+  {
+    "id": "LB-0045",
+    "price": 3900,
+    "emoji": "🌻",
+    "popularity": 92,
+    "size": {
+      "ru": "Большой (60 см)",
+      "en": "Large (60 cm)",
+      "zh": "大号 (60厘米)"
+    },
+    "freshness": {
+      "ru": "10-14 дней",
+      "en": "10-14 days",
+      "zh": "10-14天"
+    },
+    "wrap": {
+      "ru": "Джутовый шпагат",
+      "en": "Jute twine",
+      "zh": "黄麻绳"
+    }
+  },
+  {
+    "id": "LB-0046",
+    "price": 4200,
+    "emoji": "🌼",
+    "popularity": 81,
+    "size": {
+      "ru": "Средний (45 см)",
+      "en": "Medium (45 cm)",
+      "zh": "中号 (45厘米)"
+    },
+    "freshness": {
+      "ru": "5-7 дней",
+      "en": "5-7 days",
+      "zh": "5-7天"
+    },
+    "wrap": {
+      "ru": "Лён",
+      "en": "Linen",
+      "zh": "亚麻"
+    }
+  },
+  {
+    "id": "LB-0047",
+    "price": 5500,
+    "emoji": "💐",
+    "popularity": 99,
+    "size": {
+      "ru": "Большой (55 см)",
+      "en": "Large (55 cm)",
+      "zh": "大号 (55厘米)"
+    },
+    "freshness": {
+      "ru": "7-10 дней",
+      "en": "7-10 days",
+      "zh": "7-10天"
+    },
+    "wrap": {
+      "ru": "Шёлковая лента",
+      "en": "Silk ribbon",
+      "zh": "丝带"
+    }
+  },
+  {
+    "id": "LB-0048",
+    "price": 3200,
+    "emoji": "🌾",
+    "popularity": 70,
+    "size": {
+      "ru": "Средний (40 см)",
+      "en": "Medium (40 cm)",
+      "zh": "中号 (40厘米)"
+    },
+    "freshness": {
+      "ru": "3-5 дней",
+      "en": "3-5 days",
+      "zh": "3-5天"
+    },
+    "wrap": {
+      "ru": "Бечёвка",
+      "en": "Twine",
+      "zh": "麻绳"
+    }
+  },
+  {
+    "id": "LB-0049",
+    "price": 7800,
+    "emoji": "🌸",
+    "popularity": 85,
+    "size": {
+      "ru": "Премиум (65 см)",
+      "en": "Premium (65 cm)",
+      "zh": "高级 (65厘米)"
+    },
+    "freshness": {
+      "ru": "5-7 дней",
+      "en": "5-7 days",
+      "zh": "5-7天"
+    },
+    "wrap": {
+      "ru": "Бархатная коробка",
+      "en": "Velvet box",
+      "zh": "天鹅绒盒"
+    }
+  }
+]
