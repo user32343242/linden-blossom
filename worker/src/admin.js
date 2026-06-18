@@ -1,18 +1,20 @@
 import { isAuthorized, unauthorizedResponse } from './auth.js';
 
 export async function handleAdmin(request, env) {
-  if (!isAuthorized(request, env)) {
-    return unauthorizedResponse();
-  }
-
   const url    = new URL(request.url);
   const path   = url.pathname;
   const method = request.method;
 
+  // Allow unauthenticated access to the login form
   if (path === '/admin' || path === '/admin/') {
     return new Response(getAdminHTML(), {
       headers: { 'Content-Type': 'text/html; charset=utf-8' }
     });
+  }
+
+  // Require auth for API endpoints
+  if (!isAuthorized(request, env)) {
+    return unauthorizedResponse();
   }
 
   if (path === '/admin/orders' && method === 'GET') {
