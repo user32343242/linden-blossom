@@ -75,6 +75,40 @@ export async function handleAdmin(request, env) {
     }
   }
 
+  // 🔥 НОВОЕ: Сброс rate limit
+  if (path === '/admin/reset-ratelimit' && method === 'POST') {
+    try {
+      // Проверка что KV привязан
+      if (!env.ORDERS_META) {
+        return json({ error: 'ORDERS_META KV not bound' }, 500);
+      }
+
+      let body = {};
+      try { body = await request.json(); } catch {}
+      const ip = body.ip?.trim();
+
+      if (ip) {
+        // Удалить конкретный IP
+        const key = `rl:${ip}`;
+        const existed = await env.ORDERS_META.get(key);
+        await env.ORDERS_META.delete(key);
+        return json({ ok: true, deleted: existed ? 1 : 0, ip });
+      } else {
+        // Удалить все rate-limit ключи (префикс rl:)
+        const listed = await env.ORDERS_META.list({ prefix: 'rl:' });
+        let deleted = 0;
+        for (const key of listed.keys) {
+          await env.ORDERS_META.delete(key.name);
+          deleted++;
+        }
+        return json({ ok: true, deleted });
+      }
+    } catch (e) {
+      console.error('Reset ratelimit error:', e);
+      return json({ error: e.message }, 500);
+    }
+  }
+
   const patchMatch = path.match(/^\/admin\/orders\/(\d+)$/);
   if (patchMatch && method === 'PATCH') {
     const id = patchMatch[1];
@@ -277,6 +311,25 @@ function getAdminHTML() {
       transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-family: inherit; box-shadow: var(--shadow-md); }
     .btn-primary:hover { background: linear-gradient(135deg, var(--linden) 0%, var(--gold) 100%); color: var(--black);
       transform: translateY(-2px); box-shadow: 0 10px 24px rgba(200, 216, 58, 0.25); }
+    /* 🔥 НОВОЕ: стили для кнопки сброса и инпута IP */
+    .btn-danger {
+      padding: 11px 22px; background: #7f1d1d; color: #fee; border: none; border-radius: 12px;
+      font-weight: 700; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 8px;
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); font-family: inherit; box-shadow: var(--shadow-md);
+    }
+    .btn-danger:hover {
+      background: #991b1b; color: #fff; transform: translateY(-2px);
+      box-shadow: 0 10px 24px rgba(153, 27, 27, 0.3);
+    }
+    .ip-input {
+      padding: 10px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--white);
+      color: var(--fg); font-size: 13px; font-family: 'SF Mono', 'Courier New', monospace;
+      width: 170px; transition: all 0.25s ease;
+    }
+    .ip-input:focus {
+      outline: none; border-color: #991b1b; box-shadow: 0 0 0 3px rgba(153, 27, 27, 0.15);
+    }
+    .ip-input::placeholder { color: var(--fg-muted); font-family: inherit; }
     .table-container { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-xl);
       overflow: hidden; box-shadow: var(--shadow-md); }
     .table-wrapper { overflow-x: auto; }
@@ -504,6 +557,11 @@ function getAdminHTML() {
                 <button class="btn-primary" onclick="refreshOrders()">
                   <span>↻</span><span>Refresh</span>
                 </button>
+                <!-- 🔥 НОВОЕ: инструменты сброса rate limit -->
+                <input type="text" id="ipInput" class="ip-input" placeholder="IP (необяз.)">
+                <button class="btn-danger" onclick="resetRateLimit()" title="Очистить rate limit (все или по IP)">
+                  <span>⚡</span><span>Reset Rate Limit</span>
+                </button>
               </div>
             </div>
 
@@ -514,6 +572,7 @@ function getAdminHTML() {
             </div>
 
             <div id="ordersError" class="alert alert-error hidden"></div>
+            <div id="ratelimitSuccess" class="alert alert-success hidden"></div>
           </section>
 
           <section id="bouquets" class="section">
@@ -855,6 +914,48 @@ function getAdminHTML() {
         document.getElementById('statConfirmed').textContent = s.confirmed || 0;
         document.getElementById('statDone').textContent = s.done || 0;
       } catch (e) { console.error('Stats error:', e); }
+    }
+
+    // 🔥 НОВОЕ: функция сброса rate limit
+    async function resetRateLimit() {
+      if (!auth) { showError('ordersError', 'Not logged in'); return; }
+      const ipInput = document.getElementById('ipInput');
+      const ip = ipInput ? ipInput.value.trim() : '';
+      const btn = event?.target?.closest('button');
+      const originalHTML = btn ? btn.innerHTML : '';
+      
+      try {
+        if (btn) {
+          btn.disabled = true;
+          btn.innerHTML = '<span>⏳</span><span>Resetting...</span>';
+        }
+        
+        const r = await fetch('/admin/reset-ratelimit', {
+          method: 'POST',
+          headers: { Authorization: auth, 'Content-Type': 'application/json' },
+          body: JSON.stringify(ip ? { ip } : {})
+        });
+        
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: 'Request failed' }));
+          throw new Error(err.error || 'Reset failed');
+        }
+        
+        const data = await r.json();
+        const msg = ip
+          ? \`✓ Rate limit для IP "\${ip}" сброшен (удалено: \${data.deleted})\`
+          : \`✓ Все rate limit сброшены (удалено ключей: \${data.deleted})\`;
+        
+        showSuccess('ratelimitSuccess', msg);
+        if (ipInput) ipInput.value = '';
+      } catch (e) {
+        showError('ordersError', 'Reset failed: ' + e.message);
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.innerHTML = originalHTML;
+        }
+      }
     }
 
     function renderOrders(list) {
