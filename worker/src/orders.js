@@ -48,7 +48,7 @@ export async function handleOrders(request, env) {
       console.warn('Schema init (table may already exist):', err.message);
     }
 
-    // Rate limit: максимум 3 заказа в час с одного IP
+    // Rate limit: максимум 5 заказа в час с одного IP
     const ip      = request.headers.get('CF-Connecting-IP');
     const rlKey   = `rl:${ip}`;
     const rlRaw   = await env.ORDERS_META.get(rlKey);
