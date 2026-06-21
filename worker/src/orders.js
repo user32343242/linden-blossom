@@ -1,5 +1,3 @@
-//C:\Users\VECTOR\linden-blossom\worker\src\orders.js
-
 export async function handleOrders(request, env) {
   const method = request.method;
 
@@ -14,7 +12,9 @@ export async function handleOrders(request, env) {
       return json({ error: 'Invalid JSON' }, 400);
     }
 
-    const { name, phone, bouquet, message } = body;
+    // 🔥 ИЗМЕНЕНИЕ 1: Добавили price
+    const { name, phone, bouquet, message, price } = body;
+    const orderPrice = parseFloat(price) || 0.0; // Защита от нечисловых значений
 
     // ── Валидация обязательных полей ──────────────────────────────
     if (!name?.trim() || !phone?.trim()) {
@@ -31,6 +31,7 @@ export async function handleOrders(request, env) {
           phone       TEXT NOT NULL,
           name        TEXT NOT NULL,
           bouquet     TEXT NOT NULL DEFAULT '',
+          price       REAL NOT NULL DEFAULT 0.0, -- 🔥 ИЗМЕНЕНИЕ 2: Добавили колонку
           message     TEXT NOT NULL DEFAULT '',
           status      TEXT NOT NULL DEFAULT 'new',
           created_at  TEXT NOT NULL DEFAULT (datetime('now'))
@@ -65,12 +66,13 @@ export async function handleOrders(request, env) {
     // order_id временно NULL, чтобы не было конфликтов UNIQUE
     let insert;
     try {
+      // 🔥 ИЗМЕНЕНИЕ 3: Добавили price в INSERT и .bind()
       insert = await env.DB
         .prepare(`
-          INSERT INTO orders (order_id, seq_num, phone, name, bouquet, message)
-          VALUES (NULL, 0, ?, ?, ?, ?)
+          INSERT INTO orders (order_id, seq_num, phone, name, bouquet, message, price)
+          VALUES (NULL, 0, ?, ?, ?, ?, ?)
         `)
-        .bind(phone, name, bouquet || '', message || '')
+        .bind(phone, name, bouquet || '', message || '', orderPrice)
         .run();
     } catch (err) {
       console.error('D1 insert error:', err);

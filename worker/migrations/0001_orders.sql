@@ -1,13 +1,14 @@
 -- Таблица заказов
 CREATE TABLE IF NOT EXISTS orders (
+  status      TEXT NOT NULL DEFAULT 'new', -- new | confirmed | done | cancelled
   id          INTEGER PRIMARY KEY AUTOINCREMENT,
   order_id    TEXT UNIQUE,                 -- финальный orderId
   seq_num     INTEGER NOT NULL,            -- порядковый номер (rowid)
   phone       TEXT NOT NULL,
   name        TEXT NOT NULL,
   bouquet     TEXT NOT NULL DEFAULT '',
+  price       REAL NOT NULL DEFAULT 0.0,
   message     TEXT NOT NULL DEFAULT '',
-  status      TEXT NOT NULL DEFAULT 'new', -- new | confirmed | done | cancelled
   created_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 

@@ -1724,6 +1724,7 @@ const API_BASE = 'https://linden-blossom-api.privatetwe7ve.workers.dev';
 // const API_BASE = 'https://api.lindenblossom.ru';
 
 // ── Перехватить форму заказа ─────────────────────────
+// ── Перехватить форму заказа ─────────────────────────
 $('#orderForm').addEventListener('submit', async (e) => {
   e.preventDefault();
 
@@ -1732,6 +1733,7 @@ $('#orderForm').addEventListener('submit', async (e) => {
 
   const name = $('#name').value.trim();
   const phone = $('#phone').value.trim();
+  const bouquetName = $('#bouquet')?.value.trim() || '';
 
   // Сброс старых ошибок
   $('#name').closest('.form-group')?.classList.remove('error');
@@ -1752,6 +1754,22 @@ $('#orderForm').addEventListener('submit', async (e) => {
 
   if (hasError) return;
 
+  // 🔥 АВТОМАТИЧЕСКИЙ ПОИСК ЦЕНЫ ПО НАЗВАНИЮ БУКЕТА
+  let orderPrice = 0;
+  if (bouquetName) {
+    // Ищем букет в уже загруженном и переведённом массиве
+    const foundBouquet = state.sortedBouquets.find(b => 
+      b.name.toLowerCase() === bouquetName.toLowerCase()
+    );
+    if (foundBouquet) {
+      orderPrice = foundBouquet.price; // Берём цену из каталога
+    } else {
+      // Фоллбэк: ищем в сыром массиве по ID (если вдруг передали ID)
+      const rawBouquet = BOUQUETS_RAW.find(b => b.id === bouquetName);
+      if (rawBouquet) orderPrice = rawBouquet.price;
+    }
+  }
+
   submit.disabled = true;
   submit.textContent = 'Отправляем...';
 
@@ -1762,8 +1780,9 @@ $('#orderForm').addEventListener('submit', async (e) => {
       body: JSON.stringify({
         name,
         phone,
-        bouquet: $('#bouquet')?.value.trim() || '',
-        message: $('#message')?.value.trim() || ''
+        bouquet: bouquetName,
+        message: $('#message')?.value.trim() || '',
+        price: orderPrice // 🔥 ОТПРАВЛЯЕМ ЦЕНУ НА СЕРВЕР!
       })
     });
 
@@ -1791,6 +1810,7 @@ $('#orderForm').addEventListener('submit', async (e) => {
     console.error(err);
   }
 });
+
 // Вызвать при загрузке страницы
 loadBouquets();
 applyI18n();
