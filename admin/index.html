@@ -604,82 +604,92 @@
       else c.innerHTML = renderList(list);
     }
 
+
     function renderTable(list) {
-      let rows = '';
-      for (const o of list) {
-        const oid = o.order_id || o.id;
-        const bouquet = o.bouquet || '—';
-        rows += '<tr>' +
-          '<td><strong>' + oid + '</strong></td>' +
-          '<td>' + o.name + '</td>' +
-          '<td>' + o.phone + '</td>' +
-          '<td>' + bouquet + '</td>' +
-          '<td><span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span></td>' +
-          '<td>' + o.created_at + '</td>' +
-          '<td><div style="display:flex;gap:8px;align-items:center;">' +
-            '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)" style="min-width:130px;">' +
-              '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
-              '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
-              '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
-              '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
-            '</select>' +
-            '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')" title="Delete">🗑</button>' +
-          '</div></td></tr>';
-      }
-      return '<div class="table-container fade-in"><div class="table-wrapper"><table><thead><tr>' +
-        '<th>Order ID</th><th>Customer</th><th>Phone</th><th>Bouquet</th>' +
-        '<th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>' + rows +
-        '</tbody></table></div></div>';
-    }
+  let rows = '';
+  for (const o of list) {
+    const oid = o.order_id || o.id;
+    const bouquet = o.bouquet || '—';
+    const price = o.price || 0;
+    const vibe = getVibe(price);
+    
+    rows += '<tr>' +
+      '<td><strong>' + oid + '</strong></td>' +
+      '<td>' + o.name + '</td>' +
+      '<td>' + o.phone + '</td>' +
+      '<td>' + bouquet + '</td>' +
+      '<td><strong style="color: var(--honey, #c4882c);">' + price.toLocaleString() + ' ₽</strong><br><span style="font-size:10px; color:var(--fg-muted);">Vibe: ' + vibe + '/10</span></td>' +
+      '<td><span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span></td>' +
+      '<td>' + o.created_at + '</td>' +
+      '<td><div style="display:flex;gap:8px;align-items:center;">' +
+        '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)" style="min-width:130px;">' +
+          '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
+          '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
+          '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
+          '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+        '</select>' +
+        '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')" title="Delete">🗑</button>' +
+      '</div></td></tr>';
+  }
+  return '<div class="table-container fade-in"><div class="table-wrapper"><table><thead><tr>' +
+    '<th>Order ID</th><th>Customer</th><th>Phone</th><th>Bouquet</th>' +
+    '<th>Price / Vibe</th><th>Status</th><th>Date</th><th>Actions</th></tr></thead><tbody>' + rows +
+    '</tbody></table></div></div>';
+}
 
-    function renderCards(list) {
-      let cards = '';
-      for (const o of list) {
-        cards += '<div class="order-card">' +
-          '<div class="order-card-header"><div>' +
-            '<div class="order-id">Order #' + (o.order_id || o.id) + '</div>' +
-            '<div class="order-name">' + o.name + '</div>' +
-            '<div class="order-phone">📞 ' + o.phone + '</div>' +
-          '</div>' +
-          '<span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span></div>' +
-          '<div class="order-card-body">' +
-            '<div class="order-detail"><span class="order-detail-label">Bouquet</span><span>' + (o.bouquet || '—') + '</span></div>' +
-            '<div class="order-detail"><span class="order-detail-label">Message</span><span>' + (o.message || '—') + '</span></div>' +
-            '<div class="order-detail"><span class="order-detail-label">Date</span><span>' + o.created_at + '</span></div>' +
-          '</div>' +
-          '<div class="order-card-footer">' +
-            '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)" style="flex:1;">' +
-              '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
-              '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
-              '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
-              '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
-            '</select>' +
-            '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')">🗑</button>' +
-          '</div></div>';
-      }
-      return '<div class="card-grid fade-in">' + cards + '</div>';
-    }
+function renderCards(list) {
+  let cards = '';
+  for (const o of list) {
+    const price = o.price || 0;
+    const vibe = getVibe(price);
+    cards += '<div class="order-card">' +
+      '<div class="order-card-header"><div>' +
+        '<div class="order-id">Order #' + (o.order_id || o.id) + '</div>' +
+        '<div class="order-name">' + o.name + '</div>' +
+        '<div class="order-phone">📞 ' + o.phone + '</div>' +
+      '</div>' +
+      '<span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span></div>' +
+      '<div class="order-card-body">' +
+        '<div class="order-detail"><span class="order-detail-label">Bouquet</span><span>' + (o.bouquet || '—') + '</span></div>' +
+        '<div class="order-detail"><span class="order-detail-label">Price</span><span><strong>' + price.toLocaleString() + ' ₽</strong> <small style="color:var(--fg-muted);">(Vibe ' + vibe + ')</small></span></div>' +
+        '<div class="order-detail"><span class="order-detail-label">Message</span><span>' + (o.message || '—') + '</span></div>' +
+        '<div class="order-detail"><span class="order-detail-label">Date</span><span>' + o.created_at + '</span></div>' +
+      '</div>' +
+      '<div class="order-card-footer">' +
+        '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)" style="flex:1;">' +
+          '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
+          '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
+          '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
+          '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+        '</select>' +
+        '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')">🗑</button>' +
+      '</div></div>';
+  }
+  return '<div class="card-grid fade-in">' + cards + '</div>';
+}
 
-    function renderList(list) {
-      let items = '';
-      for (const o of list) {
-        items += '<div class="list-item">' +
-          '<div class="list-item-left"><div class="list-item-icon">📦</div>' +
-          '<div class="list-item-info"><h4>' + o.name + '</h4>' +
-          '<p>📞 ' + o.phone + ' · 🌸 ' + (o.bouquet || 'No bouquet') + ' · 📅 ' + o.created_at + '</p></div></div>' +
-          '<div class="list-item-right">' +
-            '<span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span>' +
-            '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)">' +
-              '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
-              '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
-              '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
-              '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
-            '</select>' +
-            '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')">🗑</button>' +
-          '</div></div>';
-      }
-      return '<div class="list-container fade-in">' + items + '</div>';
-    }
+function renderList(list) {
+  let items = '';
+  for (const o of list) {
+    const price = o.price || 0;
+    const vibe = getVibe(price);
+    items += '<div class="list-item">' +
+      '<div class="list-item-left"><div class="list-item-icon">📦</div>' +
+      '<div class="list-item-info"><h4>' + o.name + '</h4>' +
+      '<p>📞 ' + o.phone + ' · 🌸 ' + (o.bouquet || 'No bouquet') + ' · 💰 ' + price.toLocaleString() + ' ₽ <small>(Vibe ' + vibe + ')</small></p></div></div>' +
+      '<div class="list-item-right">' +
+        '<span class="status-badge ' + (o.status || '') + '"><span class="status-dot"></span>' + (o.status || '—') + '</span>' +
+        '<select class="filter-select" onchange="updateStatus(' + o.id + ',this.value)">' +
+          '<option value="new"' + (o.status === 'new' ? ' selected' : '') + '>New</option>' +
+          '<option value="confirmed"' + (o.status === 'confirmed' ? ' selected' : '') + '>Confirmed</option>' +
+          '<option value="done"' + (o.status === 'done' ? ' selected' : '') + '>Done</option>' +
+          '<option value="cancelled"' + (o.status === 'cancelled' ? ' selected' : '') + '>Cancelled</option>' +
+        '</select>' +
+        '<button class="action-btn danger" onclick="deleteOrder(' + o.id + ')">🗑</button>' +
+      '</div></div>';
+  }
+  return '<div class="list-container fade-in">' + items + '</div>';
+}
 
     async function updateStatus(id, status) {
       if (!status) return;
