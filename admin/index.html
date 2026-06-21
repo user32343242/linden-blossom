@@ -41,6 +41,14 @@
     .sidebar { width: 270px; background: var(--black); padding: 28px 24px; position: fixed; top: 1%; left: 1%; height: 98%; overflow-y: auto; z-index: 100; border-radius: var(--radius-float); box-shadow: var(--shadow-float); border: 1px solid rgba(255, 255, 255, 0.04); }
     .sidebar::-webkit-scrollbar { width: 4px; } .sidebar::-webkit-scrollbar-track { background: transparent; } .sidebar::-webkit-scrollbar-thumb { background: #2d2d2d; border-radius: 4px; }
     .sidebar-header { padding: 4px 8px 28px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 24px; }
+    /* 🔥 Эквалайзер-фон */
+#audioVisualizer {
+  mix-blend-mode: overlay;
+  filter: blur(2px);
+}
+#audioVisualizer.active {
+  opacity: 0.75;
+}
     .sidebar-logo { display: flex; align-items: center; gap: 12px; }
     .sidebar-logo-icon { width: 44px; height: 44px; border-radius: 14px; background: linear-gradient(135deg, var(--linden) 0%, var(--gold) 100%); display: flex; align-items: center; justify-content: center; font-size: 22px; box-shadow: 0 6px 16px rgba(200, 216, 58, 0.3); }
     .sidebar-logo-text { font-size: 18px; font-weight: 800; color: #ffffff; letter-spacing: -0.02em; }
@@ -145,6 +153,11 @@
   </style>
 </head>
 <body>
+   <!-- 🔥 Живой эквалайзер-фон -->
+  <canvas id="audioVisualizer" style="position: fixed; inset: 0; width: 100%; height: 100%; z-index: 0; pointer-events: none; opacity: 0; transition: opacity 0.6s ease;"></canvas>
+  
+  <div id="loginWrapper" class="login-wrapper">
+    <!-- ... остальной код ... -->
   <div id="loginWrapper" class="login-wrapper">
     <div class="login-box">
       <div class="login-header">
@@ -286,144 +299,322 @@
     let orders = [];
     let currentView = 'table';
 
-    // --- ЗВУКОВАЯ СИСТЕМА ---
-    let knownOrders = {};
-    let lastUpdateTime = Date.now();
-    let soundsEnabled = false;
-    let audioQueue = [];
-    let isPlaying = false;
-    let initialLoad = true;
-    let soundPollInterval = null;
-    let idleCheckInterval = null;
+// --- ЗВУКОВАЯ СИСТЕМА + ВИЗУАЛИЗАТОР ---
+let knownOrders = {};
+let lastUpdateTime = Date.now();
+let soundsEnabled = false;
+let audioQueue = [];
+let isPlaying = false;
+let initialLoad = true;
+let soundPollInterval = null;
+let idleCheckInterval = null;
 
-    const SOUNDS = {
-      vibe_short: [
-        { url: 'https://www.myinstants.com/media/sounds/scheienotification.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/atlantis-notification-mp3.mp3', w: 80 },
-        { url: 'https://www.myinstants.com/media/sounds/gta-v-sound.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/funimation-2012.mp3', w: 90 },
-        { url: 'https://www.myinstants.com/media/sounds/gta-v-notification.mp3', w: 95 },
-        { url: 'https://www.myinstants.com/media/sounds/thx-prank-sound.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/transition-sound-effects-presented-by-mrsnooze-unknown-album-00-005-simple-swoosh.mp3', w: 95 }
-      ],
-      top_vibe: [
-        { url: 'https://www.myinstants.com/media/sounds/tiki-tiki.mp3', w: 95 },
-        { url: 'https://www.myinstants.com/media/sounds/67-gazan.mp3', w: 90 },
-        { url: 'https://www.myinstants.com/media/sounds/subsciber-notificaiont.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/sms-ringtone.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/indian-song.mp3', w: 85 },
-        { url: 'https://www.myinstants.com/media/sounds/yeah-boiii-i-i-i.mp3', w: 80 },
-        { url: 'https://www.myinstants.com/media/sounds/run-vine-sound-effect.mp3', w: 75 },
-        { url: 'https://www.myinstants.com/media/sounds/rat-dance-music.mp3', w: 65 },
-        { url: 'https://www.myinstants.com/media/sounds/skibidi-toilet.mp3', w: 85 }
-      ],
-      vibe: [
-        { url: 'https://www.myinstants.com/media/sounds/waouh-anime.mp3', w: 50 },
-        { url: 'https://www.myinstants.com/media/sounds/terminator.mp3', w: 55 }
-      ],
-      idle: [
-        { url: 'https://www.myinstants.com/media/sounds/amogus-samsung-notification.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/a-few-moments-later-sponge-bob-sfx-fun.mp3', w: 100 }
-      ],
-      cancelled_low: [
-        { url: 'https://www.myinstants.com/media/sounds/huh-cat.mp3', w: 20 },
-        { url: 'https://www.myinstants.com/media/sounds/bruh-sound-effect_WstdzdM.mp3', w: 35 },
-        { url: 'https://www.myinstants.com/media/sounds/super-mario-beedoo_F3cwLoe.mp3', w: 45 },
-        { url: 'https://www.myinstants.com/media/sounds/spongebob-fail.mp3', w: 50 },
-        { url: 'https://www.myinstants.com/media/sounds/gotumu-sken-yokmu.mp3', w: 60 },
-        { url: 'https://www.myinstants.com/media/sounds/camera-flash-sound-effect.mp3', w: 60 },
-        { url: 'https://www.myinstants.com/media/sounds/bye-bye-lumi-athena-sfx.mp3', w: 60 }
-      ],
-      cancelled_high: [
-        { url: 'https://www.myinstants.com/media/sounds/chicken-on-tree-screaming.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/gta-v-death-sound-effect-102.mp3', w: 80 },
-        { url: 'https://www.myinstants.com/media/sounds/they-ask-you-how-you-are-and-you-just-have-to-say-that-youre-fine-sound-effect_IgYM1CV.mp3', w: 70 }
-      ],
-      confirmed: [
-        { url: 'https://www.myinstants.com/media/sounds/victory_7.mp3', w: 35 },
-        { url: 'https://www.myinstants.com/media/sounds/let-her-go.mp3', w: 30 },
-        { url: 'https://www.myinstants.com/media/sounds/du-bist-gut-genug_O9d32Jv.mp3', w: 45 },
-        { url: 'https://www.myinstants.com/media/sounds/applepay.mp3', w: 60 },
-        { url: 'https://www.myinstants.com/media/sounds/netflix-beat-remix.mp3', w: 70 },
-        { url: 'https://www.myinstants.com/media/sounds/sncf-remix.mp3', w: 80 },
-        { url: 'https://www.myinstants.com/media/sounds/gta-san-andreas-abertura-oficial.mp3', w: 95 },
-        { url: 'https://www.myinstants.com/media/sounds/skibidi-toilet.mp3', w: 85 }
-      ],
-      done_high: [
-        { url: 'https://www.myinstants.com/media/sounds/toef-toef-toef-toef-loud-asf.mp3', w: 100 },
-        { url: 'https://www.myinstants.com/media/sounds/my-movie-6_0RlWMvM.mp3', w: 100 }
-      ]
-    };
+// 🔥 Web Audio API для визуализации
+let audioCtx = null;
+let analyser = null;
+let dataArray = null;
+let visualizerCanvas = null;
+let visualizerCtx = null;
+let animationId = null;
 
-    function getVibe(price) {
-      if (!price) return 1;
-      let v = Math.round(((price - 3200) / (7800 - 3200)) * 9 + 1);
-      return Math.max(1, Math.min(10, v));
+function initAudioContext() {
+  if (audioCtx) return;
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.75;
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    analyser.connect(audioCtx.destination);
+    
+    visualizerCanvas = document.getElementById('audioVisualizer');
+    visualizerCtx = visualizerCanvas.getContext('2d');
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+  } catch (e) {
+    console.warn('AudioContext init failed:', e);
+  }
+}
+
+function resizeCanvas() {
+  if (!visualizerCanvas) return;
+  visualizerCanvas.width = window.innerWidth;
+  visualizerCanvas.height = window.innerHeight;
+}
+
+function startVisualizer() {
+  if (animationId || !visualizerCanvas) return;
+  visualizerCanvas.classList.add('active');
+  drawVisualizer();
+}
+
+function stopVisualizer() {
+  if (animationId) {
+    cancelAnimationFrame(animationId);
+    animationId = null;
+  }
+  if (visualizerCanvas) {
+    visualizerCanvas.classList.remove('active');
+  }
+}
+
+function drawVisualizer() {
+  if (!analyser || !visualizerCtx) return;
+  
+  animationId = requestAnimationFrame(drawVisualizer);
+  analyser.getByteFrequencyData(dataArray);
+  
+  const w = visualizerCanvas.width;
+  const h = visualizerCanvas.height;
+  const ctx = visualizerCtx;
+  
+  // Плавное затухание предыдущего кадра
+  ctx.fillStyle = 'rgba(245, 245, 240, 0.08)';
+  ctx.fillRect(0, 0, w, h);
+  
+  // Вычисляем среднюю энергию (бас + средние частоты)
+  let bassEnergy = 0;
+  let midEnergy = 0;
+  const bassRange = Math.floor(dataArray.length * 0.15);
+  const midRange = Math.floor(dataArray.length * 0.4);
+  
+  for (let i = 0; i < bassRange; i++) bassEnergy += dataArray[i];
+  for (let i = bassRange; i < midRange; i++) midEnergy += dataArray[i];
+  
+  bassEnergy = bassEnergy / bassRange / 255;
+  midEnergy = midEnergy / (midRange - bassRange) / 255;
+  
+  const energy = bassEnergy * 0.7 + midEnergy * 0.3;
+  
+  // 🔥 Рисуем центральное свечение (пульсирует с басом)
+  const pulseRadius = Math.min(w, h) * (0.3 + energy * 0.4);
+  const gradient = ctx.createRadialGradient(w/2, h/2, 0, w/2, h/2, pulseRadius);
+  
+  // Linden blossom цвета с прозрачностью от энергии
+  const alpha = 0.15 + energy * 0.35;
+  gradient.addColorStop(0, `rgba(200, 216, 58, ${alpha})`);      // linden
+  gradient.addColorStop(0.5, `rgba(201, 162, 39, ${alpha * 0.6})`); // gold
+  gradient.addColorStop(1, 'rgba(245, 245, 240, 0)');
+  
+  ctx.globalCompositeOperation = 'source-over';
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, w, h);
+  
+  // 🔥 Волновые кольца (расходятся от центра)
+  ctx.globalCompositeOperation = 'screen';
+  const ringCount = 5;
+  for (let i = 0; i < ringCount; i++) {
+    const ringEnergy = dataArray[Math.floor(i * dataArray.length / ringCount)] / 255;
+    if (ringEnergy < 0.2) continue;
+    
+    const radius = (Math.min(w, h) * 0.2) + (i * pulseRadius / ringCount);
+    const ringAlpha = ringEnergy * 0.4;
+    
+    ctx.beginPath();
+    ctx.arc(w/2, h/2, radius, 0, Math.PI * 2);
+    ctx.strokeStyle = i % 2 === 0 
+      ? `rgba(200, 216, 58, ${ringAlpha})`
+      : `rgba(201, 162, 39, ${ringAlpha})`;
+    ctx.lineWidth = 2 + ringEnergy * 6;
+    ctx.stroke();
+  }
+  
+  // 🔥 Вертикальные полосы эквалайзера по краям
+  ctx.globalCompositeOperation = 'screen';
+  const barCount = 32;
+  const barWidth = w / barCount;
+  
+  for (let i = 0; i < barCount; i++) {
+    const dataIndex = Math.floor(i * dataArray.length / barCount);
+    const barHeight = (dataArray[dataIndex] / 255) * h * 0.4;
+    
+    if (barHeight < 10) continue;
+    
+    // Градиент от linden к gold
+    const barGradient = ctx.createLinearGradient(0, h, 0, h - barHeight);
+    barGradient.addColorStop(0, `rgba(200, 216, 58, ${0.3 + (dataArray[dataIndex]/255) * 0.4})`);
+    barGradient.addColorStop(1, `rgba(201, 162, 39, 0)`);
+    
+    ctx.fillStyle = barGradient;
+    // Слева
+    ctx.fillRect(i * barWidth * 0.3, h - barHeight, barWidth * 0.8, barHeight);
+    // Справа (зеркально)
+    ctx.fillRect(w - (i * barWidth * 0.3) - barWidth * 0.8, h - barHeight, barWidth * 0.8, barHeight);
+  }
+  
+  // 🔥 Светящиеся частицы, которые "вылетают" при сильных басах
+  if (bassEnergy > 0.6) {
+    const particleCount = Math.floor(bassEnergy * 8);
+    for (let i = 0; i < particleCount; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const distance = pulseRadius * (0.8 + Math.random() * 0.4);
+      const px = w/2 + Math.cos(angle) * distance;
+      const py = h/2 + Math.sin(angle) * distance;
+      const size = 3 + Math.random() * 5;
+      
+      ctx.beginPath();
+      ctx.arc(px, py, size, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(200, 216, 58, ${0.4 + Math.random() * 0.3})`;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = 'rgba(200, 216, 58, 0.8)';
+      ctx.fill();
+      ctx.shadowBlur = 0;
     }
+  }
+  
+  ctx.globalCompositeOperation = 'source-over';
+}
 
-    function pickSound(category) {
-      const items = SOUNDS[category];
-      if (!items || items.length === 0) return null;
-      const totalWeight = items.reduce((sum, item) => sum + item.w, 0);
-      let r = Math.random() * totalWeight;
-      for (let item of items) {
-        if (r < item.w) return item.url;
-        r -= item.w;
-      }
-      return items[items.length - 1].url;
-    }
+const SOUNDS = {
+  vibe_short: [
+    { url: 'https://www.myinstants.com/media/sounds/scheienotification.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/atlantis-notification-mp3.mp3', w: 80 },
+    { url: 'https://www.myinstants.com/media/sounds/gta-v-sound.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/funimation-2012.mp3', w: 90 },
+    { url: 'https://www.myinstants.com/media/sounds/gta-v-notification.mp3', w: 95 },
+    { url: 'https://www.myinstants.com/media/sounds/thx-prank-sound.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/transition-sound-effects-presented-by-mrsnooze-unknown-album-00-005-simple-swoosh.mp3', w: 95 }
+  ],
+  top_vibe: [
+    { url: 'https://www.myinstants.com/media/sounds/tiki-tiki.mp3', w: 95 },
+    { url: 'https://www.myinstants.com/media/sounds/67-gazan.mp3', w: 90 },
+    { url: 'https://www.myinstants.com/media/sounds/subsciber-notificaiont.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/sms-ringtone.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/indian-song.mp3', w: 85 },
+    { url: 'https://www.myinstants.com/media/sounds/yeah-boiii-i-i-i.mp3', w: 80 },
+    { url: 'https://www.myinstants.com/media/sounds/run-vine-sound-effect.mp3', w: 75 },
+    { url: 'https://www.myinstants.com/media/sounds/rat-dance-music.mp3', w: 65 },
+    { url: 'https://www.myinstants.com/media/sounds/skibidi-toilet.mp3', w: 85 }
+  ],
+  vibe: [
+    { url: 'https://www.myinstants.com/media/sounds/waouh-anime.mp3', w: 50 },
+    { url: 'https://www.myinstants.com/media/sounds/terminator.mp3', w: 55 }
+  ],
+  idle: [
+    { url: 'https://www.myinstants.com/media/sounds/amogus-samsung-notification.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/a-few-moments-later-sponge-bob-sfx-fun.mp3', w: 100 }
+  ],
+  cancelled_low: [
+    { url: 'https://www.myinstants.com/media/sounds/huh-cat.mp3', w: 20 },
+    { url: 'https://www.myinstants.com/media/sounds/bruh-sound-effect_WstdzdM.mp3', w: 35 },
+    { url: 'https://www.myinstants.com/media/sounds/super-mario-beedoo_F3cwLoe.mp3', w: 45 },
+    { url: 'https://www.myinstants.com/media/sounds/spongebob-fail.mp3', w: 50 },
+    { url: 'https://www.myinstants.com/media/sounds/gotumu-sken-yokmu.mp3', w: 60 },
+    { url: 'https://www.myinstants.com/media/sounds/camera-flash-sound-effect.mp3', w: 60 },
+    { url: 'https://www.myinstants.com/media/sounds/bye-bye-lumi-athena-sfx.mp3', w: 60 }
+  ],
+  cancelled_high: [
+    { url: 'https://www.myinstants.com/media/sounds/chicken-on-tree-screaming.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/gta-v-death-sound-effect-102.mp3', w: 80 },
+    { url: 'https://www.myinstants.com/media/sounds/they-ask-you-how-you-are-and-you-just-have-to-say-that-youre-fine-sound-effect_IgYM1CV.mp3', w: 70 }
+  ],
+  confirmed: [
+    { url: 'https://www.myinstants.com/media/sounds/victory_7.mp3', w: 35 },
+    { url: 'https://www.myinstants.com/media/sounds/let-her-go.mp3', w: 30 },
+    { url: 'https://www.myinstants.com/media/sounds/du-bist-gut-genug_O9d32Jv.mp3', w: 45 },
+    { url: 'https://www.myinstants.com/media/sounds/applepay.mp3', w: 60 },
+    { url: 'https://www.myinstants.com/media/sounds/netflix-beat-remix.mp3', w: 70 },
+    { url: 'https://www.myinstants.com/media/sounds/sncf-remix.mp3', w: 80 },
+    { url: 'https://www.myinstants.com/media/sounds/gta-san-andreas-abertura-oficial.mp3', w: 95 },
+    { url: 'https://www.myinstants.com/media/sounds/skibidi-toilet.mp3', w: 85 }
+  ],
+  done_high: [
+    { url: 'https://www.myinstants.com/media/sounds/toef-toef-toef-toef-loud-asf.mp3', w: 100 },
+    { url: 'https://www.myinstants.com/media/sounds/my-movie-6_0RlWMvM.mp3', w: 100 }
+  ]
+};
 
-    function playSound(url) {
-      if (!soundsEnabled || !url) return;
-      audioQueue.push(url);
-      if (!isPlaying) processQueue();
-    }
+function getVibe(price) {
+  if (!price) return 1;
+  let v = Math.round(((price - 3200) / (7800 - 3200)) * 9 + 1);
+  return Math.max(1, Math.min(10, v));
+}
 
-    function processQueue() {
-      if (audioQueue.length === 0) { isPlaying = false; return; }
-      isPlaying = true;
-      const url = audioQueue.shift();
-      const audio = new Audio(url);
-      audio.volume = 0.8;
-      audio.play().catch(e => console.warn("Audio play blocked/failed:", e));
-      audio.onended = () => processQueue();
-      audio.onerror = () => processQueue();
-    }
+function pickSound(category) {
+  const items = SOUNDS[category];
+  if (!items || items.length === 0) return null;
+  const totalWeight = items.reduce((sum, item) => sum + item.w, 0);
+  let r = Math.random() * totalWeight;
+  for (let item of items) {
+    if (r < item.w) return item.url;
+    r -= item.w;
+  }
+  return items[items.length - 1].url;
+}
 
-    function triggerNewOrderSound(vibe) {
-      if (vibe === 10) {
-        playSound(pickSound('vibe_short'));
-        playSound(pickSound('top_vibe'));
-      } else {
-        playSound(pickSound('vibe'));
-      }
-    }
+function playSound(url) {
+  if (!soundsEnabled || !url) return;
+  audioQueue.push(url);
+  if (!isPlaying) processQueue();
+}
 
-    function triggerStatusChangeSound(status, vibe) {
-      if (status === 'cancelled') {
-        if (vibe === 10) playSound(pickSound('cancelled_high'));
-        else playSound(pickSound('cancelled_low'));
-      } else if (status === 'confirmed') {
-        playSound(pickSound('confirmed'));
-      } else if (status === 'done') {
-        if (vibe === 10) playSound(pickSound('done_high'));
-        else playSound(pickSound('confirmed'));
-      }
+function processQueue() {
+  if (audioQueue.length === 0) {
+    isPlaying = false;
+    stopVisualizer(); // 🔥 Останавливаем визуализатор
+    return;
+  }
+  isPlaying = true;
+  const url = audioQueue.shift();
+  const audio = new Audio(url);
+  audio.volume = 0.8;
+  audio.crossOrigin = 'anonymous';
+  
+  // 🔥 Подключаем звук к AudioContext для визуализации
+  if (audioCtx && analyser) {
+    try {
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const source = audioCtx.createMediaElementSource(audio);
+      source.connect(analyser);
+      // analyser уже подключен к destination в initAudioContext
+      startVisualizer();
+    } catch (e) {
+      console.warn('Audio routing failed:', e);
     }
+  }
+  
+  audio.play().catch(e => console.warn("Audio play blocked/failed:", e));
+  audio.onended = () => processQueue();
+  audio.onerror = () => processQueue();
+}
 
-    function toggleSounds() {
-      soundsEnabled = !soundsEnabled;
-      const btn = document.getElementById('soundToggleBtn');
-      if (btn) {
-        btn.innerHTML = soundsEnabled ? '🔊' : '🔇';
-        btn.title = soundsEnabled ? 'Disable Sounds' : 'Enable Sounds';
-      }
-      if (soundsEnabled) {
-        // Разблокировка autoplay в браузере
-        const a = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==");
-        a.play().catch(()=>{});
-      }
-    }
+function triggerNewOrderSound(vibe) {
+  if (vibe === 10) {
+    playSound(pickSound('vibe_short'));
+    playSound(pickSound('top_vibe'));
+  } else {
+    playSound(pickSound('vibe'));
+  }
+}
+
+function triggerStatusChangeSound(status, vibe) {
+  if (status === 'cancelled') {
+    if (vibe === 10) playSound(pickSound('cancelled_high'));
+    else playSound(pickSound('cancelled_low'));
+  } else if (status === 'confirmed') {
+    playSound(pickSound('confirmed'));
+  } else if (status === 'done') {
+    if (vibe === 10) playSound(pickSound('done_high'));
+    else playSound(pickSound('confirmed'));
+  }
+}
+
+function toggleSounds() {
+  soundsEnabled = !soundsEnabled;
+  const btn = document.getElementById('soundToggleBtn');
+  if (btn) {
+    btn.innerHTML = soundsEnabled ? '🔊' : '🔇';
+    btn.title = soundsEnabled ? 'Disable Sounds' : 'Enable Sounds';
+  }
+  if (soundsEnabled) {
+    initAudioContext(); // 🔥 Инициализируем аудио при включении
+    // Разблокировка autoplay в браузере
+    const a = new Audio("data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEAQB8AAEAfAAABAAgAAABmYWN0BAAAAAAAAABkYXRhAAAAAA==");
+    a.play().catch(()=>{});
+  } else {
+    stopVisualizer();
+  }
+}
 
     function processOrderUpdates(currentOrders) {
       let hasChanges = false;
