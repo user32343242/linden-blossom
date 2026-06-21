@@ -55,7 +55,7 @@ export async function handleOrders(request, env) {
     const rlRaw   = await env.ORDERS_META.get(rlKey);
     const rlCount = rlRaw ? parseInt(rlRaw) : 0;
     
-    if (rlCount >= 5) {
+    if (rlCount >= 10) {
       return json({ error: 'Too many requests. Try again later.' }, 429);
     }
     
